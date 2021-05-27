@@ -957,7 +957,7 @@ void TransonicPerturbationPotentialFlowElement<TDim, TNumNodes>::CalculateLeftHa
         if (PartitionsSign[i] > 0)
         {
             noalias(lhs_positive) += Volumes[i] * upper_density * prod(data.DN_DX, trans(data.DN_DX));
-            if( upper_local_velocity_squared < max_velocity_squared){
+            if(upper_local_velocity_squared < max_velocity_squared) {
                 noalias(lhs_positive) += Volumes[i] * 2 * upper_DrhoDu2 * outer_prod(upper_DNV, trans(upper_DNV));
             }
 
@@ -965,7 +965,7 @@ void TransonicPerturbationPotentialFlowElement<TDim, TNumNodes>::CalculateLeftHa
         else
         {
             noalias(lhs_negative) += Volumes[i] * lower_density * prod(data.DN_DX, trans(data.DN_DX));
-            if( lower_local_velocity_squared < max_velocity_squared){
+            if(lower_local_velocity_squared < max_velocity_squared) {
                 noalias(lhs_negative) += Volumes[i] * 2 * lower_DrhoDu2 * outer_prod(lower_DNV, trans(lower_DNV));
             }
         }
@@ -1048,8 +1048,8 @@ void TransonicPerturbationPotentialFlowElement<TDim, TNumNodes>::AssignLeftHandS
     {
         // The TE node takes the contribution of the subdivided element and
         // we do not apply the wake condition on the TE node
-        if (r_geometry[i].GetValue(TRAILING_EDGE)){
-            for (unsigned int j = 0; j < TNumNodes; ++j){
+        if (r_geometry[i].GetValue(TRAILING_EDGE)) {
+            for (unsigned int j = 0; j < TNumNodes; ++j) {
                 rLeftHandSideMatrix(i, j) = lhs_positive(i, j);
                 rLeftHandSideMatrix(i + TNumNodes, j + TNumNodes) = lhs_negative(i, j);
             }
