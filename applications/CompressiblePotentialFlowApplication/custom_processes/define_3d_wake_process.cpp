@@ -23,13 +23,21 @@ Define3DWakeProcess::Define3DWakeProcess(ModelPart& rTrailingEdgeModelPart,
                                          ModelPart& rBodyModelPart,
                                          ModelPart& rStlWakeModelPart,
                                          const double Tolerance,
-                                         const Vector& rWakeNormal)
+                                         const Vector& rWakeNormal,
+                                         const Vector& rWakeDirection,
+                                         const bool SwitchWakeDirection,
+                                         const bool CountElementsNumber,
+                                         const bool WriteElementsIdsToFile)
     : Process(),
       mrTrailingEdgeModelPart(rTrailingEdgeModelPart),
       mrBodyModelPart(rBodyModelPart),
       mrStlWakeModelPart(rStlWakeModelPart),
       mTolerance(Tolerance),
-      mWakeNormal(rWakeNormal)
+      mWakeNormal(rWakeNormal),
+      mWakeDirection(rWakeDirection),
+      mSwitchWakeDirection(SwitchWakeDirection),
+      mCountElementsNumber(CountElementsNumber),
+      mWriteElementsIdsToFile(WriteElementsIdsToFile)
 {
     KRATOS_ERROR_IF(mWakeNormal.size() != 3)
         << "The mWakeNormal should be a vector with 3 components!"
@@ -40,27 +48,33 @@ void Define3DWakeProcess::ExecuteInitialize()
 {
     ModelPart& root_model_part = mrBodyModelPart.GetRootModelPart();
     auto& r_nodes = root_model_part.Nodes();
-    VariableUtils().SetNonHistoricalVariable(WING_TIP, 0, r_nodes);
+    VariableUtils().SetNonHistoricalVariable(UPPER_SURFACE, false, r_nodes);
+    VariableUtils().SetNonHistoricalVariable(LOWER_SURFACE, false, r_nodes);
 
     InitializeTrailingEdgeSubModelpart();
 
     InitializeWakeSubModelpart();
 
-    SetWakeAndSpanDirections();
+    // Compute span direction as the cross product: mWakeNormal x mWakeDirection
+    MathUtils<double>::CrossProduct(mSpanDirection, mWakeNormal, mWakeDirection);
 
     MarkTrailingEdgeNodes();
 
-    ComputeLowerSurfaceNormals();
+    ComputeWingLowerSurfaceNormals();
 
     MarkWakeElements();
 
     MarkKuttaElements();
 
-    AddWakeNodes();
+    AddWakeNodesToWakeModelPart();
 
-    CountElementNumber();
+    if(mCountElementsNumber){
+        CountElementsNumber();
+    }
 
-    // PrintElementIdsToFile();
+    if(mWriteElementsIdsToFile){
+        WriteElementIdsToFile();
+    }
 }
 // This function initializes the variables and removes all of the elements of
 // the trailing edge submodelpart
@@ -113,119 +127,55 @@ void Define3DWakeProcess::InitializeWakeSubModelpart() const
     }
 }
 
-void Define3DWakeProcess::SetWakeAndSpanDirections()
-{
-    const auto free_stream_velocity = mrBodyModelPart.GetProcessInfo().GetValue(FREE_STREAM_VELOCITY);
-    KRATOS_ERROR_IF(free_stream_velocity.size() != 3)
-        << "The free stream velocity should be a vector with 3 components!"
-        << std::endl;
-
-    // Computing the norm of the free_stream_velocity vector
-    const double norm = std::sqrt(inner_prod(free_stream_velocity, free_stream_velocity));
-
-    const double eps = std::numeric_limits<double>::epsilon();
-    KRATOS_ERROR_IF(norm < eps)
-        << "The norm of the free stream velocity should be different than 0."
-        << std::endl;
-
-    // The wake direction is the free stream direction
-    mWakeDirection = free_stream_velocity / norm;
-    MathUtils<double>::CrossProduct(mSpanDirection, mWakeNormal, mWakeDirection);
-}
-
 void Define3DWakeProcess::MarkTrailingEdgeNodes()
 {
-    KRATOS_WATCH(mrTrailingEdgeModelPart.NumberOfNodes())
-    // // chord at the root
-    // const double A = 0.8104915;
-
-    // // pi
-    // const double pi = 3.14159265358979;
-
-    // // trailing edge sweep in degrees
-    // const double te_sweep = 15.69175411;
-    // const double te_sweep_rad = te_sweep * pi / 180.0;
-
-    // // angle of attack in degrees
-    // const double aoa = 3.06;
-    // const double aoa_rad = aoa * pi / 180.0;
-
-    // std::vector<std::size_t> te_nodes_ordered_ids;
-    // for (auto& r_node : mrBodyModelPart.Nodes()) {
-    //     const double new_x = ( r_node.Y() * tan(te_sweep_rad) + A ) * cos(aoa_rad);
-    //     if( r_node.X() > new_x - 0.0001){
-    //         r_node.SetValue(TRAILING_EDGE, true);
-    //         r_node.SetValue(KUTTA, 5.0);
-    //         r_node.SetValue(NUMBER_OF_NEIGHBOUR_ELEMENTS, 0.0);
-    //         r_node.SetValue(TE_ELEMENT_COUNTER, 0);
-    //         te_nodes_ordered_ids.push_back(r_node.Id());
-    //     }
-    // }
-
-    // std::sort(te_nodes_ordered_ids.begin(),
-    //           te_nodes_ordered_ids.end());
-    // mrTrailingEdgeModelPart.AddNodes(te_nodes_ordered_ids);
-    // KRATOS_WATCH(mrTrailingEdgeModelPart.NumberOfNodes())
-
-    // KRATOS_ERROR_IF(mrTrailingEdgeModelPart.NumberOfNodes() == 0) << "There are no nodes in the mrTrailingEdgeModelPart!"<< std::endl;
-
-    /////////////////////////////////////////////////////////////////
-
-    double max_span_position = std::numeric_limits<double>::lowest();
-    double min_span_position = std::numeric_limits<double>::max();
-
-    auto p_right_wing_tip_node = &*mrTrailingEdgeModelPart.NodesBegin();
-    auto p_left_wing_tip_node = &*mrTrailingEdgeModelPart.NodesBegin();
-
     for (auto& r_node : mrTrailingEdgeModelPart.Nodes()) {
         r_node.SetValue(TRAILING_EDGE, true);
-        r_node.SetValue(NUMBER_OF_NEIGHBOUR_ELEMENTS, 0.0);
-        const auto& r_coordinates = r_node.Coordinates();
-        const double distance_projection = inner_prod(r_coordinates, mSpanDirection);
+    }
+}
 
-        if(distance_projection > max_span_position){
-            p_right_wing_tip_node = &r_node;
-            max_span_position = distance_projection;
-        }
-        if(distance_projection < min_span_position){
-            p_left_wing_tip_node = &r_node;
-            min_span_position = distance_projection;
+// This function computes the wing lower surface normals and marks the upper and
+// lower surfaces. The wing lower surface normals are used later in
+// ComputeNodalDistancesToWakeAndLowerSurface inside the MarkKuttaElements
+// function to check whether nodes are above or below the wake
+// TODO: Think a better way of doing this.
+void Define3DWakeProcess::ComputeWingLowerSurfaceNormals() const
+{
+    // TO DISCUSS: Is it worth it to run these loops in parallel?
+    // So far not much different in terms of speed has been noted.
+    // Also, when ran in parallel the result is random, which I don't
+    // understand why. I don't see any type of race condition here.
+    // Mark upper surface
+    for (auto& r_cond : mrBodyModelPart.Conditions()) {
+        auto& r_geometry = r_cond.GetGeometry();
+        const auto& surface_normal = r_geometry.UnitNormal(0);
+        const double projection = inner_prod(surface_normal, mWakeNormal);
+
+        if(!(projection > 0.0)){
+            for (unsigned int j = 0; j < r_geometry.size(); j++) {
+                r_geometry[j].SetLock();
+                // QUESTION: Do we need to initialize the variable UPPER_SURFACE to false?
+                r_geometry[j].SetValue(UPPER_SURFACE, true);
+                r_geometry[j].UnSetLock();
+            }
         }
     }
 
-    mpRightWingTipNode = p_right_wing_tip_node;
-    mpLeftWingTipNode = p_left_wing_tip_node;
-    mpRightWingTipNode->SetValue(WING_TIP, true);
-    mpLeftWingTipNode->SetValue(WING_TIP, true);
-}
-
-void Define3DWakeProcess::ComputeLowerSurfaceNormals() const
-{
-    #pragma omp parallel for
-    for (int i = 0; i < static_cast<int>(mrBodyModelPart.Conditions().size()); i++) {
-        ModelPart::ConditionIterator it_cond = mrBodyModelPart.ConditionsBegin() + i;
-
-        auto r_geometry = it_cond->GetGeometry();
-        auto surface_normal = r_geometry.UnitNormal(0);
+    // Mark lower surface
+    for (auto& r_cond : mrBodyModelPart.Conditions()) {
+        auto& r_geometry = r_cond.GetGeometry();
+        const auto& surface_normal = r_geometry.UnitNormal(0);
         const double projection = inner_prod(surface_normal, mWakeNormal);
 
         if(projection > 0.0){
-            for (unsigned int i = 0; i < it_cond->GetGeometry().size(); i++) {
-                r_geometry[i].SetLock();
-                r_geometry[i].SetValue(NORMAL, surface_normal);
-                r_geometry[i].SetValue(LOWER_SURFACE, true);
-                r_geometry[i].UnSetLock();
-            }
-        }
-        else{
-            for (unsigned int i = 0; i < it_cond->GetGeometry().size(); i++) {
-                r_geometry[i].SetLock();
-                r_geometry[i].SetValue(UPPER_SURFACE, true);
-                r_geometry[i].UnSetLock();
+            for (unsigned int j = 0; j < r_geometry.size(); j++) {
+                r_geometry[j].SetLock();
+                r_geometry[j].SetValue(NORMAL, surface_normal);
+                r_geometry[j].SetValue(LOWER_SURFACE, true);
+                r_geometry[j].UnSetLock();
             }
         }
     }
-
 }
 
 // This function checks which elements are cut by the wake and marks them as
@@ -238,33 +188,52 @@ void Define3DWakeProcess::MarkWakeElements()
     std::vector<std::size_t> wake_elements_ordered_ids;
     std::vector<std::size_t> wake_nodes_ordered_ids;
 
+    // TODO: substitute with CalculateDiscontinuousDistanceToSkinProcess
+    const auto start_time(std::chrono::steady_clock::now());
     CalculateDistanceToSkinProcess<3> distance_calculator(root_model_part, mrStlWakeModelPart);
     distance_calculator.Execute();
+    const auto end_time = std::chrono::duration_cast<std::chrono::duration<double>>(
+                              std::chrono::steady_clock::now() - start_time)
+                              .count();
+    KRATOS_INFO("MarkWakeElements") << " distance_calculator took " << end_time
+                                    << " [sec]" << std::endl;
 
-    #pragma omp parallel for
-    for (int i = 0; i < static_cast<int>(root_model_part.Elements().size()); i++) {
-        ModelPart::ElementIterator it_elem = root_model_part.ElementsBegin() + i;
+    // This variable allows to inverse the distances computed with the distance
+    // process, it is useful if the user makes a mistake and defines the wake
+    // surface with the normal pointing downwards.
+    double wake_normal_switching_factor = 1.0;
+    if(mSwitchWakeDirection){
+        wake_normal_switching_factor = -1.0;
+    }
 
+    block_for_each(root_model_part.Elements(), [&](Element& rElement)
+    {
         // Check if the element is touching the trailing edge
-        CheckIfTrailingEdgeElement(*it_elem);
+        auto& r_geometry = rElement.GetGeometry();
+        CheckIfTrailingEdgeElement(rElement, r_geometry);
 
-
-        if(it_elem->Is(TO_SPLIT)){
-            it_elem->SetValue(WAKE, true);
+        // Mark wake elements, save their ids, save the elemental distances in
+        // the element and in the nodes, and save wake nodes ids
+        if (rElement.Is(TO_SPLIT))
+        {
+            // Mark wake elements
+            rElement.SetValue(WAKE, true);
+            // Save wake elements ids
             #pragma omp critical
             {
-                wake_elements_ordered_ids.push_back(it_elem->Id());
+                wake_elements_ordered_ids.push_back(rElement.Id());
             }
-            auto wake_elemental_distances_tmp = it_elem->GetValue(ELEMENTAL_DISTANCES);
-            auto wake_elemental_distances = it_elem->GetValue(ELEMENTAL_DISTANCES);
-            for(unsigned int j = 0; j < wake_elemental_distances.size(); j++){
-                wake_elemental_distances[j] = wake_elemental_distances_tmp[j];
-
-            }
-            auto r_geometry = it_elem->GetGeometry();
-            for(unsigned int j = 0; j < wake_elemental_distances.size(); j++){
-                if(std::abs(wake_elemental_distances[j] < mTolerance)){
-                    if(wake_elemental_distances[j] < 0.0){
+            // Save elemental distances in the element
+            array_1d<double,4>  wake_elemental_distances = ZeroVector(4);
+            wake_elemental_distances = wake_normal_switching_factor * rElement.GetValue(ELEMENTAL_DISTANCES);
+            rElement.SetValue(WAKE_ELEMENTAL_DISTANCES, wake_elemental_distances);
+            // Save elemental distances in the nodes
+            for (unsigned int j = 0; j < wake_elemental_distances.size(); j++)
+            {
+                if (std::abs(wake_elemental_distances[j] < mTolerance))
+                {
+                    if (wake_elemental_distances[j] < 0.0)
+                    {
                         wake_elemental_distances[j] = - mTolerance;
                     }
                     else{
@@ -274,14 +243,16 @@ void Define3DWakeProcess::MarkWakeElements()
                 r_geometry[j].SetLock();
                 r_geometry[j].SetValue(WAKE_DISTANCE, wake_elemental_distances[j]);
                 r_geometry[j].UnSetLock();
+                // Save nodes ids
                 #pragma omp critical
                 {
                     wake_nodes_ordered_ids.push_back(r_geometry[j].Id());
                 }
             }
-            it_elem->SetValue(WAKE_ELEMENTAL_DISTANCES, wake_elemental_distances);
+
         }
-    }
+    });
+
     // Add the trailing edge elements to the trailing_edge_sub_model_part
     AddTrailingEdgeAndWakeElements(wake_elements_ordered_ids);
     std::sort(wake_nodes_ordered_ids.begin(),
@@ -292,19 +263,20 @@ void Define3DWakeProcess::MarkWakeElements()
 }
 
 // This function checks if the element is touching the trailing edge
-void Define3DWakeProcess::CheckIfTrailingEdgeElement(Element& rElement)
+void Define3DWakeProcess::CheckIfTrailingEdgeElement(Element& rElement, Geometry<NodeType>& rGeometry)
 {
     // Loop over element nodes
-    for (unsigned int i = 0; i < rElement.GetGeometry().size(); i++) {
+    for (unsigned int i = 0; i < rGeometry.size(); i++) {
         // Elements touching the trailing edge are trailing edge elements
-        const auto& r_node = rElement.GetGeometry()[i];
-        if (r_node.GetValue(TRAILING_EDGE)) {
+        rGeometry[i].SetLock();
+        if (rGeometry[i].GetValue(TRAILING_EDGE)) {
             rElement.SetValue(TRAILING_EDGE, true);
             #pragma omp critical
             {
                 mTrailingEdgeElementsOrderedIds.push_back(rElement.Id());
             }
         }
+        rGeometry[i].UnSetLock();
     }
 }
 
@@ -334,13 +306,13 @@ void Define3DWakeProcess::MarkKuttaElements()
 
     std::vector<std::size_t> wake_elements_ordered_ids;
 
-    // #pragma omp parallel for
-    for (int i = 0; i < static_cast<int>(trailing_edge_sub_model_part.Elements().size()); i++) {
-        ModelPart::ElementsContainerType::ptr_iterator it_p_elem = trailing_edge_sub_model_part.Elements().ptr_begin() + i;
-        auto p_elem = *it_p_elem;
-
-        auto& r_geometry = p_elem->GetGeometry();
-        // Selecting a trailing edge node
+    // TO DISCUSS: Is it worth it to run this loop in parallel?
+    // So far not much different in terms of speed has been noted.
+    block_for_each(trailing_edge_sub_model_part.Elements(), [&](Element& rElement)
+    {
+        auto& r_geometry = rElement.GetGeometry();
+        // Selecting one trailing edge node from the element
+        // (this gets the last one according to the order within r_geometry)
         NodeType::Pointer p_trailing_edge_node;
         unsigned int number_of_te_nodes = 0;
         for (unsigned int j = 0; j < r_geometry.size(); j++){
@@ -351,13 +323,15 @@ void Define3DWakeProcess::MarkKuttaElements()
             }
         }
 
-        KRATOS_ERROR_IF(number_of_te_nodes < 0.5) << "Number of trailing edge nodes must be larger than 0 " << p_elem->Id()
-        << " number_of_te_nodes = " << number_of_te_nodes << std::endl;
+        KRATOS_ERROR_IF(number_of_te_nodes < 1)
+            << "Number of trailing edge nodes must be 1 or larger. Element Id: "
+            << rElement.Id() << " number_of_te_nodes = " << number_of_te_nodes
+            << std::endl;
 
         const unsigned int number_of_non_te_nodes = 4 - number_of_te_nodes;
 
         Vector nodal_distances_to_te = ZeroVector(number_of_non_te_nodes);
-        ComputeNodalDistancesToWakeAndLowerSurface(r_geometry, p_trailing_edge_node, nodal_distances_to_te);
+        ComputeNodalDistancesToWakeOrWingLowerSurface(r_geometry, p_trailing_edge_node, nodal_distances_to_te);
 
         unsigned int number_of_nodes_with_negative_distance = 0;
         unsigned int number_of_nodes_with_positive_distance = 0;
@@ -371,14 +345,9 @@ void Define3DWakeProcess::MarkKuttaElements()
             }
         }
 
-        if(p_elem->Id()==116695){
-            KRATOS_WATCH(number_of_nodes_with_negative_distance)
-            KRATOS_WATCH(number_of_nodes_with_positive_distance)
-        }
-
         // Wake structure elements (cut)
-        if(number_of_nodes_with_positive_distance > 0 && number_of_nodes_with_negative_distance > 0 && p_elem->GetValue(WAKE)){
-            p_elem->Set(STRUCTURE);
+        if(number_of_nodes_with_positive_distance > 0 && number_of_nodes_with_negative_distance > 0 && rElement.GetValue(WAKE)){
+            rElement.Set(STRUCTURE);
             BoundedVector<double, 4> wake_elemental_distances = ZeroVector(4);
             unsigned int counter = 0;
             for(unsigned int j = 0; j < r_geometry.size(); j++){
@@ -401,49 +370,22 @@ void Define3DWakeProcess::MarkKuttaElements()
                     counter += 1;
                 }
             }
-            p_elem->SetValue(WAKE_ELEMENTAL_DISTANCES, wake_elemental_distances);
+            rElement.SetValue(WAKE_ELEMENTAL_DISTANCES, wake_elemental_distances);
         }
-        // Kutta elements (below)
+        // Kutta elements (below). Kutta elements have all non_te_nodes with negative distance:
+        // 1 te node  -> 3 non te nodes with negative distance
+        // 2 te nodes -> 2 non te nodes with negative distance
         else if(number_of_nodes_with_negative_distance > number_of_non_te_nodes - 1){
-            p_elem->SetValue(KUTTA, true);
-            p_elem->SetValue(WAKE, false);
-            p_elem->Set(TO_ERASE, true);
-
-            // p_elem->Set(STRUCTURE);
-            // p_elem->SetValue(WAKE, true);
-            // #pragma omp critical
-            // {
-            //     wake_elements_ordered_ids.push_back(p_elem->Id());
-            // }
-            // BoundedVector<double, 4> wake_elemental_distances = ZeroVector(4);
-            // unsigned int counter = 0;
-            // for(unsigned int j = 0; j < r_geometry.size(); j++){
-            //     const auto& r_node = r_geometry[j];
-            //     if(r_node.GetValue(TRAILING_EDGE)){
-            //         wake_elemental_distances[j] = mTolerance;
-            //         r_geometry[j].SetLock();
-            //         r_geometry[j].SetValue(WAKE_DISTANCE, mTolerance);
-            //         r_geometry[j].UnSetLock();
-            //         auto& r_number_of_neighbour_elements = r_geometry[j].GetValue(NUMBER_OF_NEIGHBOUR_ELEMENTS);
-            //         #pragma omp atomic
-            //         r_number_of_neighbour_elements += 1;
-            //     }
-            //     else{
-            //         r_geometry[j].SetLock();
-            //         r_geometry[j].SetValue(WAKE_DISTANCE, nodal_distances_to_te[counter]);
-            //         r_geometry[j].UnSetLock();
-            //         wake_elemental_distances[j] = nodal_distances_to_te[counter];
-            //         counter += 1;
-            //     }
-            // }
-            // p_elem->SetValue(WAKE_ELEMENTAL_DISTANCES, wake_elemental_distances);
+            rElement.SetValue(KUTTA, true);
+            rElement.SetValue(WAKE, false);
+            rElement.Set(TO_ERASE, true);
         }
-        // Normal elements (above)
+        // Normal elements (above). Normal elements have all nodes with positive distance.
         else{
-            p_elem->SetValue(WAKE, false);
-            p_elem->Set(TO_ERASE, true);
+            rElement.SetValue(WAKE, false);
+            rElement.Set(TO_ERASE, true);
         }
-    }
+    });
 
     std::sort(wake_elements_ordered_ids.begin(),
               wake_elements_ordered_ids.end());
@@ -453,27 +395,33 @@ void Define3DWakeProcess::MarkKuttaElements()
     KRATOS_INFO("MarkKuttaElements") << "...Selecting kutta elements finished..." << std::endl;
 }
 
-void Define3DWakeProcess::ComputeNodalDistancesToWakeAndLowerSurface(const Element::GeometryType& rGeom, NodeType::Pointer pTrailingEdgeNode, Vector& rNodalDistancesToTe) const
+// This function computes the distances from the current element non trailing
+// edge nodes to the wake or to the wing lower surface, depending whether the
+// node is behind or in front of the trailing edge according to the wake
+// direction (free stream velocity direction).
+void Define3DWakeProcess::ComputeNodalDistancesToWakeOrWingLowerSurface(const Element::GeometryType& rGeom, NodeType::Pointer pTrailingEdgeNode, Vector& rNodalDistancesToTe) const
 {
     unsigned int counter = 0;
     for (unsigned int i = 0; i < rGeom.size(); i++){
         const auto& r_node = rGeom[i];
         if (!r_node.GetValue(TRAILING_EDGE)){
-            // Compute the distance vector from the trailing edge to the node
+            // Compute the distance vector from the selected trailing edge node to the current node
             const array_1d<double,3> distance_vector = r_node.Coordinates() - pTrailingEdgeNode->Coordinates();
 
             // Compute the distance in the free stream direction
             const double free_stream_direction_distance = inner_prod(distance_vector, mWakeDirection);
 
             double distance;
-            // Nodes touching the lower surface have negative distance
+            // Nodes in the lower surface are directly assigned a negative distance
             if(r_node.GetValue(LOWER_SURFACE)){
                 distance = - mTolerance;
             }
-            // Nodes touching the upper surface have positive distance
+            // Nodes in the upper surface are directly assigned a positive distance
             else if(r_node.GetValue(UPPER_SURFACE)){
                 distance = mTolerance;
             }
+            //  For the nodes in front of the selected trailing edge node, the
+            //  distance is computed according to the lower surface normal
             else if(free_stream_direction_distance < 0.0){
                 distance = inner_prod(distance_vector, pTrailingEdgeNode->GetValue(NORMAL));
                 // Nodes under the wing are given a negative distance
@@ -481,29 +429,23 @@ void Define3DWakeProcess::ComputeNodalDistancesToWakeAndLowerSurface(const Eleme
                     distance = - mTolerance;
                 }
             }
-            else{
+            // For the nodes behind of the selected trailing edge node, the
+            // distance is computed according to the wake normal
+            else
+            {
                 distance = inner_prod(distance_vector, mWakeNormal);
                 // Nodes slightly below and above the wake are given a positive distance (wake down)
                 if(std::abs(distance) < mTolerance){
                     distance = mTolerance;
                 }
-                // // Nodes slightly below and above the wake are given a positive distance (wake up)
-                // if(std::abs(distance) < mTolerance){
-                //     distance = -mTolerance;
-                // }
             }
-
-            // if(std::abs(distance) < mTolerance){
-            //     distance = - mTolerance;
-            // }
-
             rNodalDistancesToTe[counter] = distance;
             counter += 1;
         }
     }
 }
 
-void Define3DWakeProcess::AddWakeNodes() const
+void Define3DWakeProcess::AddWakeNodesToWakeModelPart() const
 {
     ModelPart& root_model_part = mrBodyModelPart.GetRootModelPart();
     ModelPart& wake_sub_model_part =
@@ -520,10 +462,11 @@ void Define3DWakeProcess::AddWakeNodes() const
     std::sort(wake_nodes_ordered_ids.begin(),
               wake_nodes_ordered_ids.end());
     wake_sub_model_part.AddNodes(wake_nodes_ordered_ids);
-
 }
 
-void Define3DWakeProcess::CountElementNumber() const
+// This function counts the number of elements of each type. Useful for
+// debugging purposes.
+void Define3DWakeProcess::CountElementsNumber() const
 {
     ModelPart& root_model_part = mrBodyModelPart.GetRootModelPart();
     ModelPart& trailing_edge_sub_model_part =
@@ -560,7 +503,9 @@ void Define3DWakeProcess::CountElementNumber() const
     KRATOS_WATCH(all_wake_elements_counter)
 }
 
-void Define3DWakeProcess::PrintElementIdsToFile() const
+// This function prints the elements ids into a file. Useful for debugging
+// purposes.
+void Define3DWakeProcess::WriteElementIdsToFile() const
 {
     ModelPart& root_model_part = mrBodyModelPart.GetRootModelPart();
     ModelPart& trailing_edge_sub_model_part =

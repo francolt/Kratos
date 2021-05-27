@@ -36,11 +36,14 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
             "model_part_name": "",
             "body_model_part_name": "",
             "wake_stl_file_name" : "",
+            "switch_wake_stl_normal" : false,
             "wake_normal": [0.0,0.0,1.0],
             "refinement_iterations": 0,
             "target_wake_h" : 1.0,
             "output_wake": false,
-            "epsilon": 1e-9
+            "epsilon": 1e-9,
+            "count_elements_number": false,
+            "write_elements_ids_to_file": false
         }''')
         settings.ValidateAndAssignDefaults(default_settings)
 
@@ -68,6 +71,9 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
 
         self.epsilon = settings["epsilon"].GetDouble()
         self.output_wake = settings["output_wake"].GetBool()
+        self.switch_wake_stl_normal = settings["switch_wake_stl_normal"].GetBool()
+        self.count_elements_number = settings["count_elements_number"].GetBool()
+        self.write_elements_ids_to_file = settings["write_elements_ids_to_file"].GetBool()
 
         # For now plane wake surfaces are considered.
         # TODO: Generalize this to curved wake surfaces
@@ -86,18 +92,9 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         # Read wake from stl and create the wake model part
         self.__CreateWakeModelPart()
 
-        # for section in sections:
-        #     section_model_part = self.body_model_part.GetRootModelPart().GetSubModelPart(GetSectionName(section))
-        #     for condition in section_model_part.Conditions:
-        #         condition.Set(KratosMultiphysics.TO_ERASE)
-        #     self.body_model_part.GetRootModelPart().RemoveSubModelPart(GetSectionName(section))
-        #     self.body_model_part.GetRootModelPart().RemoveConditionsFromAllLevels(KratosMultiphysics.TO_ERASE)
-
         start_time = time.time()
-        # self.trailing_edge_model_part = self.fluid_model_part.CreateSubModelPart("Wake3D_Wake_Auto1")
-        number_of_nodes = self.trailing_edge_model_part.NumberOfNodes()
-        print('number_of_nodes = ', number_of_nodes)
-        CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal).ExecuteInitialize()
+        self.wake_direction = self.fluid_model_part.ProcessInfo.GetValue(CPFApp.FREE_STREAM_VELOCITY_DIRECTION)
+        CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file).ExecuteInitialize()
         exe_time = time.time() - start_time
         print('Executing Define3DWakeProcess took ' + str(round(exe_time, 2)) + ' sec')
         print('Executing Define3DWakeProcess took ' + str(round(exe_time/60, 2)) + ' min')
@@ -533,8 +530,6 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
                                     for elem_node in elem.GetNodes():
                                         elem_node.SetValue(CPFApp.DEACTIVATED_WAKE, node_marker)
 
-                                # print(this_h)
-                                #print(elem.Id)
                                 elem.Set(KratosMultiphysics.BLOCKED, False)
                                 node.Set(KratosMultiphysics.BLOCKED, False)
                                 node.SetValue(MeshingApplication.METRIC_SCALAR, self.target_h_wake)

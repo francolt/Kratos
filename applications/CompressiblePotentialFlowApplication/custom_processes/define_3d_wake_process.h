@@ -7,7 +7,7 @@
 //  License:         BSD License
 //                   Kratos default license: kratos/license.txt
 //
-//  Main authors:    Inigo Lopez
+//  Main authors:    Inigo Lopez and Marc Nunez
 //
 
 #if !defined(KRATOS_DEFINE_3D_WAKE_PROCESS_H_INCLUDED )
@@ -46,7 +46,11 @@ public:
                         ModelPart& rBodyModelPart,
                         ModelPart& rStlWakeModelPart,
                         const double Tolerance,
-                        const Vector& rWakeNormal);
+                        const Vector& rWakeNormal,
+                        const Vector& rWakeDirection,
+                        const bool SwitchWakeDirection,
+                        const bool CountElementsNumber,
+                        const bool WriteElementsIdsToFile);
 
     /// Copy constructor.
     Define3DWakeProcess(Define3DWakeProcess const& rOther) = delete;
@@ -103,9 +107,9 @@ private:
     const Vector& mWakeNormal;
     BoundedVector<double, 3> mWakeDirection;
     BoundedVector<double, 3> mSpanDirection;
-
-    NodeType* mpRightWingTipNode;
-    NodeType* mpLeftWingTipNode;
+    bool mSwitchWakeDirection;
+    bool mCountElementsNumber;
+    bool mWriteElementsIdsToFile;
 
     // Vector to store the trailing edge elements ids
     std::vector<std::size_t> mTrailingEdgeElementsOrderedIds;
@@ -120,33 +124,25 @@ private:
 
     void InitializeWakeSubModelpart() const;
 
-    void SetWakeAndSpanDirections();
-
     void MarkTrailingEdgeNodes();
 
-    void ComputeLowerSurfaceNormals() const;
+    void ComputeWingLowerSurfaceNormals() const;
 
     void MarkWakeElements();
 
-    void CheckIfTrailingEdgeElement(Element& rElement);
+    void CheckIfTrailingEdgeElement(Element& rElement, Geometry<NodeType>& rGeometry);
 
     void AddTrailingEdgeAndWakeElements(std::vector<std::size_t>& rWakeElementsOrderedIds);
 
     void MarkKuttaElements();
 
-    void ComputeNodalDistancesToWakeAndLowerSurface(const Element::GeometryType& rGeom, NodeType::Pointer pTrailingEdgeNode, Vector& rNodalDistancesToTe) const;
+    void ComputeNodalDistancesToWakeOrWingLowerSurface(const Element::GeometryType& rGeom, NodeType::Pointer pTrailingEdgeNode, Vector& rNodalDistancesToTe) const;
 
-    void AddWakeNodes() const;
+    void AddWakeNodesToWakeModelPart() const;
 
-    void SelectWakeTipNodes() const;
+    void CountElementsNumber() const;
 
-    void SelectDoubleTrailingEdgeElements() const;
-
-    void ApplyMPConstraints() const;
-
-    void CountElementNumber() const;
-
-    void PrintElementIdsToFile() const;
+    void WriteElementIdsToFile() const;
     ///@}
 
 }; // Class Define3DWakeProcess
