@@ -112,7 +112,8 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         print('Executing __ShedWakeSurfaceFromTheTrailingEdge took ' + str(round(exe_time/60, 2)) + ' min')
 
         start_time = time.time()
-        CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file).ExecuteInitialize()
+        self.shed_wake_from_trailing_edge = True
+        CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file, self.shed_wake_from_trailing_edge).ExecuteInitialize()
         exe_time = time.time() - start_time
         print('Executing Define3DWakeProcess took ' + str(round(exe_time, 2)) + ' sec')
         print('Executing Define3DWakeProcess took ' + str(round(exe_time/60, 2)) + ' min')
@@ -210,13 +211,18 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
     # TODO: implement an automatic generation of the wake
     def __CreateWakeModelPart(self):
         self.wake_model_part = self.model.CreateModelPart("wake_model_part")
-        self.dummy_property = self.wake_model_part.Properties[0]
-        self.node_id = 1
-        self.elem_id = 1
-        if not self.shed_wake_from_trailing_edge:
-            self.__ReadWakeStlModelFromFile()
-        else:
-            self.__ShedWakeSurfaceFromTheTrailingEdge()
+        # self.dummy_property = self.wake_model_part.Properties[0]
+        # self.node_id = 1
+        # self.elem_id = 1
+        # if not self.shed_wake_from_trailing_edge:
+        #     self.__ReadWakeStlModelFromFile()
+        # else:
+        #     self.__ShedWakeSurfaceFromTheTrailingEdge()
+
+        number_of_nodes = self.wake_model_part.NumberOfNodes()
+        number_of_elements = self.wake_model_part.NumberOfElements()
+        print('number_of_nodes = ', number_of_nodes)
+        print('number_of_elements = ', number_of_elements)
 
     def __ReadWakeStlModelFromFile(self):
         from stl import mesh #this requires numpy-stl
@@ -258,6 +264,10 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         size = 0.2
         number_of_elements_in_wake_direction = int(shedded_distance/size)
         z = 1e-9
+        print('shedded_distance = ', shedded_distance)
+        print('size = ', size)
+        print('number_of_elements_in_wake_direction = ', number_of_elements_in_wake_direction)
+        print('z = ', z)
 
         for condition in self.trailing_edge_model_part.Conditions:
             vertex1 = condition.GetNodes()[0]

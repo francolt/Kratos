@@ -50,7 +50,8 @@ public:
                         const Vector& rWakeDirection,
                         const bool SwitchWakeDirection,
                         const bool CountElementsNumber,
-                        const bool WriteElementsIdsToFile);
+                        const bool WriteElementsIdsToFile,
+                        const bool ShedWakeFromTrailingEdge);
 
     /// Copy constructor.
     Define3DWakeProcess(Define3DWakeProcess const& rOther) = delete;
@@ -110,6 +111,7 @@ private:
     bool mSwitchWakeDirection;
     bool mCountElementsNumber;
     bool mWriteElementsIdsToFile;
+    bool mShedWakeFromTrailingEdge;
 
     // Vector to store the trailing edge elements ids
     std::vector<std::size_t> mTrailingEdgeElementsOrderedIds;
@@ -124,9 +126,11 @@ private:
 
     void InitializeWakeSubModelpart() const;
 
-    void MarkTrailingEdgeNodes();
+    void MarkTrailingEdgeNodes() const;
 
     void ComputeWingLowerSurfaceNormals() const;
+
+    void ShedWakeSurfaceFromTheTrailingEdge() const;
 
     void MarkWakeElements();
 
