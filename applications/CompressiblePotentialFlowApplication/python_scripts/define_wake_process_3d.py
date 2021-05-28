@@ -11,6 +11,13 @@ def DotProduct(A,B):
         result += i*j
     return result
 
+def CrossProduct(A, B):
+    C = KratosMultiphysics.Vector(3)
+    C[0] = A[1]*B[2]-A[2]*B[1]
+    C[1] = A[2]*B[0]-A[0]*B[2]
+    C[2] = A[0]*B[1]-A[1]*B[0]
+    return C
+
 sections=[-1]
 def GetSectionName(section):
     if section ==-1:
@@ -35,6 +42,7 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         default_settings = KratosMultiphysics.Parameters(r'''{
             "model_part_name": "",
             "body_model_part_name": "",
+            "shed_wake_from_trailing_edge": false,
             "wake_stl_file_name" : "",
             "switch_wake_stl_normal" : false,
             "wake_normal": [0.0,0.0,1.0],
@@ -63,11 +71,17 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
             raise Exception(err_msg)
         self.body_model_part = Model[body_model_part_name]
 
+        self.shed_wake_from_trailing_edge = settings["shed_wake_from_trailing_edge"].GetBool()
+        if self.shed_wake_from_trailing_edge:
+            warn_msg = 'Generating the wake automatically from the trailing edge.'
+            KratosMultiphysics.Logger.PrintWarning('::[DefineWakeProcess3D]::', warn_msg)
+
         self.wake_stl_file_name = settings["wake_stl_file_name"].GetString()
         if self.wake_stl_file_name == "":
-            err_msg = "Empty wake_stl_file_name in DefineWakeProcess3D\n"
-            err_msg += "Please specify the stl file name that contains the wake surface nodes"
-            raise Exception(err_msg)
+            self.shed_wake_from_trailing_edge = True
+            warn_msg = 'Empty wake_stl_file_name in DefineWakeProcess3D,'
+            warn_msg += ' generating the wake automatically from the trailing edge.'
+            KratosMultiphysics.Logger.PrintWarning('::[DefineWakeProcess3D]::', warn_msg)
 
         self.epsilon = settings["epsilon"].GetDouble()
         self.output_wake = settings["output_wake"].GetBool()
@@ -88,12 +102,16 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         self.target_h_wake = settings["target_wake_h"].GetDouble()
 
     def ExecuteInitialize(self):
+        self.wake_direction = self.fluid_model_part.ProcessInfo.GetValue(CPFApp.FREE_STREAM_VELOCITY_DIRECTION)
 
         # Read wake from stl and create the wake model part
+        start_time = time.time()
         self.__CreateWakeModelPart()
+        exe_time = time.time() - start_time
+        print('Executing __ShedWakeSurfaceFromTheTrailingEdge took ' + str(round(exe_time, 2)) + ' sec')
+        print('Executing __ShedWakeSurfaceFromTheTrailingEdge took ' + str(round(exe_time/60, 2)) + ' min')
 
         start_time = time.time()
-        self.wake_direction = self.fluid_model_part.ProcessInfo.GetValue(CPFApp.FREE_STREAM_VELOCITY_DIRECTION)
         CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file).ExecuteInitialize()
         exe_time = time.time() - start_time
         print('Executing Define3DWakeProcess took ' + str(round(exe_time, 2)) + ' sec')
@@ -144,8 +162,8 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         # # Mark the elements touching the trailing edge from below as kutta
         # self.__MarkKuttaElements()
         # # Output the wake in GiD for visualization
-        # if(self.output_wake):
-        #     self.__VisualizeWake()
+        if(self.output_wake):
+            self.__VisualizeWake()
 
     def __SetWakeAndSpanDirections(self):
         free_stream_velocity = self.fluid_model_part.ProcessInfo.GetValue(CPFApp.FREE_STREAM_VELOCITY)
@@ -191,43 +209,116 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
     # This function imports the stl file containing the wake and creates the wake model part out of it.
     # TODO: implement an automatic generation of the wake
     def __CreateWakeModelPart(self):
+        self.wake_model_part = self.model.CreateModelPart("wake_model_part")
+        self.dummy_property = self.wake_model_part.Properties[0]
+        self.node_id = 1
+        self.elem_id = 1
+        if not self.shed_wake_from_trailing_edge:
+            self.__ReadWakeStlModelFromFile()
+        else:
+            self.__ShedWakeSurfaceFromTheTrailingEdge()
+
+    def __ReadWakeStlModelFromFile(self):
         from stl import mesh #this requires numpy-stl
         wake_stl_mesh = mesh.Mesh.from_multi_file(self.wake_stl_file_name)
-        self.wake_model_part = self.model.CreateModelPart("wake_model_part")
 
-        dummy_property = self.wake_model_part.Properties[0]
-        node_id = 1
-        elem_id = 1
-        #z= -1e-5
         z= 0.0#-1e-4
 
         # Looping over stl meshes
         for stl_mesh in wake_stl_mesh:
             for vertex in stl_mesh.points:
-                node1 = self.wake_model_part.CreateNewNode(node_id, float(vertex[0]), float(vertex[1]), float(vertex[2]) + z )
-                node_id+=1
-                node2 = self.wake_model_part.CreateNewNode(node_id, float(vertex[3]), float(vertex[4]), float(vertex[5]) + z )
-                node_id+=1
-                node3 = self.wake_model_part.CreateNewNode(node_id, float(vertex[6]), float(vertex[7]), float(vertex[8]) + z )
-                node_id+=1
+                node1 = self.__AddNodeToWakeModelPart(float(vertex[0]), float(vertex[1]), float(vertex[2]) + z )
+                node2 = self.__AddNodeToWakeModelPart(float(vertex[3]), float(vertex[4]), float(vertex[5]) + z )
+                node3 = self.__AddNodeToWakeModelPart(float(vertex[6]), float(vertex[7]), float(vertex[8]) + z )
 
-                self.wake_model_part.CreateNewElement("Element3D3N", elem_id,  [
-                                              node1.Id, node2.Id, node3.Id], dummy_property)
-                elem_id += 1
+                side1 = node2 - node1
+                side2 = node3 - node1
+                face_normal = CrossProduct(side1,side2)
 
-        # compute_wake_normal = False
-        # for elem in self.wake_model_part.Elements:
-        #     if not compute_wake_normal:
-        #         #print(elem.GetGeometry().Normal())
-        #         wake_normal = elem.GetGeometry().Normal()
-        #         magnitude = -math.sqrt(DotProduct(wake_normal,wake_normal))
-        #         compute_wake_normal = True
-        #         for i in range(len(self.wake_normal)):
-        #             self.wake_normal[i] = wake_normal[i]  / magnitude
-        #             print("{:.15f}".format(self.wake_normal[i]))
-        #         print('self.wake_normal = ', self.wake_normal)
+                normal_projection = DotProduct(face_normal, self.wake_normal)
 
+                if normal_projection >  0.0:
+                    self.__AddElementToWakeModelPart(node1.Id, node2.Id, node3.Id)
+                else:
+                    self.__AddElementToWakeModelPart(node1.Id, node3.Id, node2.Id)
 
+        compute_wake_normal = False
+        for elem in self.wake_model_part.Elements:
+            if not compute_wake_normal:
+                #print(elem.GetGeometry().Normal())
+                wake_normal = elem.GetGeometry().Normal()
+                magnitude = math.sqrt(DotProduct(wake_normal,wake_normal))
+                wake_normal /= magnitude
+                print('wake_normal = ', wake_normal)
+                compute_wake_normal = True
+
+    def __ShedWakeSurfaceFromTheTrailingEdge(self):
+        print('shedding from trailing edge')
+        shedded_distance = 12.5
+        size = 0.2
+        number_of_elements_in_wake_direction = int(shedded_distance/size)
+        z = 1e-9
+
+        for condition in self.trailing_edge_model_part.Conditions:
+            vertex1 = condition.GetNodes()[0]
+            vertex2 = condition.GetNodes()[1]
+            vertex3 = vertex1 + size * self.wake_direction
+            vertex4 = vertex2 + size * self.wake_direction
+
+            node1 = self.__AddNodeToWakeModelPart(vertex1.X, vertex1.Y, vertex1.Z + z)
+            node2 = self.__AddNodeToWakeModelPart(vertex2.X, vertex2.Y, vertex2.Z + z)
+            node3 = self.__AddNodeToWakeModelPart(vertex3[0], vertex3[1], vertex3[2] + z)
+            node4 = self.__AddNodeToWakeModelPart(vertex4[0], vertex4[1], vertex4[2] + z)
+
+            self.__AddElementsToWakeModelPart(node1,node2,node3,node4)
+
+            for _ in range(number_of_elements_in_wake_direction):
+                vertex1 = vertex3
+                vertex2 = vertex4
+                vertex3 = vertex1 + size * self.wake_direction
+                vertex4 = vertex2 + size * self.wake_direction
+
+                node1 = self.__AddNodeToWakeModelPart(vertex1[0], vertex1[1], vertex1[2] + z)
+                node2 = self.__AddNodeToWakeModelPart(vertex2[0], vertex2[1], vertex2[2] + z)
+                node3 = self.__AddNodeToWakeModelPart(vertex3[0], vertex3[1], vertex3[2] + z)
+                node4 = self.__AddNodeToWakeModelPart(vertex4[0], vertex4[1], vertex4[2] + z)
+
+                self.__AddElementsToWakeModelPart(node1,node2,node3,node4)
+
+        compute_wake_normal = False
+        for elem in self.wake_model_part.Elements:
+            if not compute_wake_normal:
+                #print(elem.GetGeometry().Normal())
+                wake_normal = elem.GetGeometry().Normal()
+                magnitude = math.sqrt(DotProduct(wake_normal,wake_normal))
+                wake_normal /= magnitude
+                print('wake_normal = ', wake_normal)
+                compute_wake_normal = True
+
+    def __AddNodeToWakeModelPart(self, x, y, z):
+        node = self.wake_model_part.CreateNewNode(self.node_id, x, y, z)
+        self.node_id +=1
+        return node
+
+    def __AddElementToWakeModelPart(self, id1, id2, id3):
+        self.wake_model_part.CreateNewElement("Element3D3N", self.elem_id,  [id1, id2, id3], self.dummy_property)
+        self.elem_id += 1
+
+    def __AddElementsToWakeModelPart(self, node1, node2, node3, node4):
+        side1 = node2 - node1
+        side2 = node3 - node1
+        face_normal = CrossProduct(side1,side2)
+
+        # TODO: substitue here wake normal with local wing upper surface normal
+        # (it is more robust for curved trailing edges)
+        normal_projection = DotProduct(face_normal, self.wake_normal)
+
+        if normal_projection > 0.0:
+            self.__AddElementToWakeModelPart(node1.Id, node2.Id, node3.Id)
+            self.__AddElementToWakeModelPart(node2.Id, node4.Id, node3.Id)
+        else:
+            self.__AddElementToWakeModelPart(node1.Id, node3.Id, node2.Id)
+            self.__AddElementToWakeModelPart(node2.Id, node3.Id, node4.Id)
 
     # Check which elements are cut and mark them as wake
     def __MarkWakeElements(self):
