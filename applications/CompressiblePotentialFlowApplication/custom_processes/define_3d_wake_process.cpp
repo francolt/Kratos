@@ -353,16 +353,14 @@ void Define3DWakeProcess::MarkKuttaElements()
             for(unsigned int j = 0; j < r_geometry.size(); j++){
                 const auto& r_node = r_geometry[j];
                 if(r_node.GetValue(TRAILING_EDGE)){
+                    // Trailing edge nodes are given a positive distance
                     wake_elemental_distances[j] = mTolerance;
                     r_geometry[j].SetLock();
-                    // Trailing edge nodes are given a positive distance
                     r_geometry[j].SetValue(WAKE_DISTANCE, mTolerance);
                     r_geometry[j].UnSetLock();
-                    auto& r_number_of_neighbour_elements = r_geometry[j].GetValue(NUMBER_OF_NEIGHBOUR_ELEMENTS);
-                    #pragma omp atomic
-                    r_number_of_neighbour_elements += 1;
                 }
                 else{
+                    // Assigning computed distance
                     r_geometry[j].SetLock();
                     r_geometry[j].SetValue(WAKE_DISTANCE, nodal_distances_to_te[counter]);
                     r_geometry[j].UnSetLock();
