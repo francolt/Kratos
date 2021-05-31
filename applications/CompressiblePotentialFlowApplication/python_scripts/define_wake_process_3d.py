@@ -113,6 +113,7 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
 
         start_time = time.time()
         self.shed_wake_from_trailing_edge = True
+        print('shed_wake_from_trailing_edge = ', self.shed_wake_from_trailing_edge)
         CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file, self.shed_wake_from_trailing_edge).ExecuteInitialize()
         exe_time = time.time() - start_time
         print('Executing Define3DWakeProcess took ' + str(round(exe_time, 2)) + ' sec')
@@ -228,7 +229,7 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         from stl import mesh #this requires numpy-stl
         wake_stl_mesh = mesh.Mesh.from_multi_file(self.wake_stl_file_name)
 
-        z= 0.0#-1e-4
+        z = 0.0#-1e-4
 
         # Looping over stl meshes
         for stl_mesh in wake_stl_mesh:
@@ -275,8 +276,8 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
             vertex3 = vertex1 + size * self.wake_direction
             vertex4 = vertex2 + size * self.wake_direction
 
-            node1 = self.__AddNodeToWakeModelPart(vertex1.X, vertex1.Y, vertex1.Z + z)
-            node2 = self.__AddNodeToWakeModelPart(vertex2.X, vertex2.Y, vertex2.Z + z)
+            node1 = self.__AddNodeToWakeModelPart(vertex1.X,   vertex1.Y, vertex1.Z + z)
+            node2 = self.__AddNodeToWakeModelPart(vertex2.X,   vertex2.Y, vertex2.Z + z)
             node3 = self.__AddNodeToWakeModelPart(vertex3[0], vertex3[1], vertex3[2] + z)
             node4 = self.__AddNodeToWakeModelPart(vertex4[0], vertex4[1], vertex4[2] + z)
 

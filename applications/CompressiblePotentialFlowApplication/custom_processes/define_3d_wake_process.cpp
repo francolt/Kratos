@@ -64,6 +64,7 @@ void Define3DWakeProcess::ExecuteInitialize()
 
     ComputeWingLowerSurfaceNormals();
 
+    KRATOS_WATCH(mShedWakeFromTrailingEdge)
     if(mShedWakeFromTrailingEdge){
         ShedWakeSurfaceFromTheTrailingEdge();
     }
@@ -194,7 +195,7 @@ void Define3DWakeProcess::ShedWakeSurfaceFromTheTrailingEdge() const
     const double element_size = 0.2;
     const double number_of_elements = shedded_distance / element_size;
     const unsigned int number_of_elements_in_wake_direction = int(number_of_elements);
-    const double z = 1e-9;
+    const double z = 0.0;
     // KRATOS_WATCH(shedded_distance)
     KRATOS_WATCH(element_size)
     KRATOS_WATCH(number_of_elements)
@@ -310,8 +311,8 @@ void Define3DWakeProcess::MarkWakeElements()
         KRATOS_INFO("MarkWakeElements") << " Switching wake element distances!" << std::endl;
         wake_normal_switching_factor = -1.0;
     }
-    // std::ofstream outfile_wake;
-    // outfile_wake.open("wake_elements_id.txt");
+    std::ofstream outfile_wake;
+    outfile_wake.open("wake_elements_process_id.txt");
 
     block_for_each(root_model_part.Elements(), [&](Element& rElement)
     {
@@ -328,10 +329,10 @@ void Define3DWakeProcess::MarkWakeElements()
             // Save wake elements ids
             #pragma omp critical
             {
-                // std::ofstream outfile_wake;
-                // outfile_wake.open("wake_elements_id.txt", std::ios_base::app);
-                // outfile_wake << rElement.Id();
-                // outfile_wake << "\n";
+                std::ofstream outfile_wake;
+                outfile_wake.open("wake_elements_process_id.txt", std::ios_base::app);
+                outfile_wake << rElement.Id();
+                outfile_wake << "\n";
                 wake_elements_ordered_ids.push_back(rElement.Id());
             }
             // Save elemental distances in the element
@@ -369,6 +370,7 @@ void Define3DWakeProcess::MarkWakeElements()
     std::sort(wake_nodes_ordered_ids.begin(),
               wake_nodes_ordered_ids.end());
     root_model_part.GetSubModelPart("wake_elements_model_part").AddNodes(wake_nodes_ordered_ids);
+    KRATOS_WATCH(root_model_part.GetSubModelPart("wake_elements_model_part").NumberOfElements());
     KRATOS_WATCH(root_model_part.GetSubModelPart("wake_elements_model_part").NumberOfNodes());
     KRATOS_INFO("MarkWakeElements") << "...Selecting wake elements finished..." << std::endl;
     KRATOS_CATCH("");
