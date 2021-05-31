@@ -212,18 +212,13 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
     # TODO: implement an automatic generation of the wake
     def __CreateWakeModelPart(self):
         self.wake_model_part = self.model.CreateModelPart("wake_model_part")
-        # self.dummy_property = self.wake_model_part.Properties[0]
-        # self.node_id = 1
-        # self.elem_id = 1
-        # if not self.shed_wake_from_trailing_edge:
-        #     self.__ReadWakeStlModelFromFile()
-        # else:
+        self.dummy_property = self.wake_model_part.Properties[0]
+        self.node_id = 1
+        self.elem_id = 1
+        if not self.shed_wake_from_trailing_edge:
+            self.__ReadWakeStlModelFromFile()
+        # else: This is now implemented in cpp
         #     self.__ShedWakeSurfaceFromTheTrailingEdge()
-
-        number_of_nodes = self.wake_model_part.NumberOfNodes()
-        number_of_elements = self.wake_model_part.NumberOfElements()
-        print('number_of_nodes = ', number_of_nodes)
-        print('number_of_elements = ', number_of_elements)
 
     def __ReadWakeStlModelFromFile(self):
         from stl import mesh #this requires numpy-stl

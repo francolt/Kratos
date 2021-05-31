@@ -132,6 +132,31 @@ private:
 
     void ShedWakeSurfaceFromTheTrailingEdge() const;
 
+    void CreateWakeSurfaceNodesAndElements(IndexType& rNode_index,
+                                           array_1d<double, 3>& rCoordinates1,
+                                           array_1d<double, 3>& rCoordinates2,
+                                           array_1d<double, 3>& rCoordinates3,
+                                           array_1d<double, 3>& rCoordinates4,
+                                           IndexType& rElement_index,
+                                           const Properties::Pointer pElemProp) const;
+
+    std::vector<ModelPart::IndexType> CreateWakeSurfaceNodes(
+        IndexType& rNode_index,
+        array_1d<double, 3>& rCoordinates1,
+        array_1d<double, 3>& rCoordinates2,
+        array_1d<double, 3>& rCoordinates3,
+        array_1d<double, 3>& rCoordinates4) const;
+
+    double ComputeFaceNormalProjectionToWakeNormal(array_1d<double, 3>& rCoordinates1,
+                                                   array_1d<double, 3>& rCoordinates2,
+                                                   array_1d<double, 3>& rCoordinates3,
+                                                   array_1d<double, 3>& rCoordinates4) const;
+
+    void CreateWakeSurfaceElements(const double normal_projection,
+                                   IndexType& rElement_index,
+                                   const std::vector<ModelPart::IndexType>& rNodes_ids,
+                                   const Properties::Pointer pElemProp) const;
+
     void MarkWakeElements();
 
     void CheckIfTrailingEdgeElement(Element& rElement, Geometry<NodeType>& rGeometry);

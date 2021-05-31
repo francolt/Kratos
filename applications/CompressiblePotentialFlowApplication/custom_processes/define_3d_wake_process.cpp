@@ -187,20 +187,12 @@ void Define3DWakeProcess::ComputeWingLowerSurfaceNormals() const
 
 void Define3DWakeProcess::ShedWakeSurfaceFromTheTrailingEdge() const
 {
-    // ModelPart& root_model_part = mrTrailingEdgeModelPart.GetRootModelPart();
-    // root_model_part.CreateSubModelPart("wake_model_part");
-    // ModelPart& wake_surface_model_part = root_model_part.GetSubModelPart("wake_model_part");
-    Properties::Pointer pElemProp = mrStlWakeModelPart.CreateNewProperties(0);
+    const Properties::Pointer pElemProp = mrStlWakeModelPart.pGetProperties(0);
     const double shedded_distance = 12.5;
     const double element_size = 0.2;
     const double number_of_elements = shedded_distance / element_size;
     const unsigned int number_of_elements_in_wake_direction = int(number_of_elements);
-    const double z = 0.0;
-    // KRATOS_WATCH(shedded_distance)
-    KRATOS_WATCH(element_size)
-    KRATOS_WATCH(number_of_elements)
-    KRATOS_WATCH(number_of_elements_in_wake_direction)
-    KRATOS_WATCH(z)
+
     IndexType node_index = 0;
     IndexType element_index = 0;
 
@@ -216,33 +208,8 @@ void Define3DWakeProcess::ShedWakeSurfaceFromTheTrailingEdge() const
         coordinates3 = coordinates1 + element_size * mWakeDirection;
         coordinates4 = coordinates2 + element_size * mWakeDirection;
 
-        const auto& p_node1 = mrStlWakeModelPart.CreateNewNode(
-            ++node_index, coordinates1[0], coordinates1[1], coordinates1[2] + z);
-        const auto& p_node2 = mrStlWakeModelPart.CreateNewNode(
-            ++node_index, coordinates2[0], coordinates2[1], coordinates2[2] + z);
-        const auto& p_node3 = mrStlWakeModelPart.CreateNewNode(
-            ++node_index, coordinates3[0], coordinates3[1], coordinates3[2] + z);
-        const auto& p_node4 = mrStlWakeModelPart.CreateNewNode(
-            ++node_index, coordinates4[0], coordinates4[1], coordinates4[2] + z);
-
-        const auto& side1 = coordinates2 - coordinates1;
-        const auto& side2 = coordinates3 - coordinates1;
-        array_1d<double, 3> face_normal = ZeroVector(3);
-        MathUtils<double>::CrossProduct(face_normal, side1, side2);
-        const double normal_projection = inner_prod(face_normal, mWakeNormal);
-
-        if(normal_projection > 0.0){
-            const std::vector<ModelPart::IndexType> elemNodes1{p_node1->Id(), p_node2->Id(), p_node3->Id()};
-            const std::vector<ModelPart::IndexType> elemNodes2{p_node1->Id(), p_node4->Id(), p_node3->Id()};
-            mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes1, pElemProp);
-            mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes2, pElemProp);
-        }
-        else{
-            const std::vector<ModelPart::IndexType> elemNodes1{p_node1->Id(), p_node3->Id(), p_node2->Id()};
-            const std::vector<ModelPart::IndexType> elemNodes2{p_node1->Id(), p_node3->Id(), p_node4->Id()};
-            mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes1, pElemProp);
-            mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes2, pElemProp);
-        }
+        CreateWakeSurfaceNodesAndElements(node_index, coordinates1, coordinates2, coordinates3,
+                                   coordinates4, element_index, pElemProp);
 
         for (unsigned int j = 0; j < number_of_elements_in_wake_direction; j++){
             coordinates1 = coordinates3;
@@ -250,37 +217,79 @@ void Define3DWakeProcess::ShedWakeSurfaceFromTheTrailingEdge() const
             coordinates3 = coordinates1 + element_size * mWakeDirection;
             coordinates4 = coordinates2 + element_size * mWakeDirection;
 
-            const auto& p_node1 = mrStlWakeModelPart.CreateNewNode(
-                ++node_index, coordinates1[0], coordinates1[1], coordinates1[2] + z);
-            const auto& p_node2 = mrStlWakeModelPart.CreateNewNode(
-                ++node_index, coordinates2[0], coordinates2[1], coordinates2[2] + z);
-            const auto& p_node3 = mrStlWakeModelPart.CreateNewNode(
-                ++node_index, coordinates3[0], coordinates3[1], coordinates3[2] + z);
-            const auto& p_node4 = mrStlWakeModelPart.CreateNewNode(
-                ++node_index, coordinates4[0], coordinates4[1], coordinates4[2] + z);
-
-            const auto& side1 = coordinates2 - coordinates1;
-            const auto& side2 = coordinates3 - coordinates1;
-            array_1d<double, 3> face_normal = ZeroVector(3);
-            MathUtils<double>::CrossProduct(face_normal, side1, side2);
-            const double normal_projection = inner_prod(face_normal, mWakeNormal);
-
-            if(normal_projection > 0.0){
-                const std::vector<ModelPart::IndexType> elemNodes1{p_node1->Id(), p_node2->Id(), p_node3->Id()};
-                const std::vector<ModelPart::IndexType> elemNodes2{p_node1->Id(), p_node4->Id(), p_node3->Id()};
-                mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes1, pElemProp);
-                mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes2, pElemProp);
-            }
-            else{
-                const std::vector<ModelPart::IndexType> elemNodes1{p_node1->Id(), p_node3->Id(), p_node2->Id()};
-                const std::vector<ModelPart::IndexType> elemNodes2{p_node1->Id(), p_node3->Id(), p_node4->Id()};
-                mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes1, pElemProp);
-                mrStlWakeModelPart.CreateNewElement("Element3D3N", ++element_index, elemNodes2, pElemProp);
-            }
+            CreateWakeSurfaceNodesAndElements(node_index, coordinates1, coordinates2, coordinates3,
+                                   coordinates4, element_index, pElemProp);
         }
     }
-    KRATOS_WATCH(mrStlWakeModelPart.NumberOfNodes())
-    KRATOS_WATCH(mrStlWakeModelPart.NumberOfElements())
+}
+
+void Define3DWakeProcess::CreateWakeSurfaceNodesAndElements(
+    IndexType& rNode_index,
+    array_1d<double, 3>& rCoordinates1,
+    array_1d<double, 3>& rCoordinates2,
+    array_1d<double, 3>& rCoordinates3,
+    array_1d<double, 3>& rCoordinates4,
+    IndexType& rElement_index,
+    const Properties::Pointer pElemProp) const
+{
+    const std::vector<ModelPart::IndexType> nodes_ids = CreateWakeSurfaceNodes(
+        rNode_index, rCoordinates1, rCoordinates2, rCoordinates3, rCoordinates4);
+
+    const double normal_projection = ComputeFaceNormalProjectionToWakeNormal(
+        rCoordinates1, rCoordinates2, rCoordinates3, rCoordinates4);
+
+    CreateWakeSurfaceElements(normal_projection, rElement_index, nodes_ids, pElemProp);
+}
+
+double Define3DWakeProcess::ComputeFaceNormalProjectionToWakeNormal(
+    array_1d<double, 3>& rCoordinates1,
+    array_1d<double, 3>& rCoordinates2,
+    array_1d<double, 3>& rCoordinates3,
+    array_1d<double, 3>& rCoordinates4) const
+{
+    const auto& side1 = rCoordinates2 - rCoordinates1;
+    const auto& side2 = rCoordinates3 - rCoordinates1;
+    array_1d<double, 3> face_normal = ZeroVector(3);
+    MathUtils<double>::CrossProduct(face_normal, side1, side2);
+    return inner_prod(face_normal, mWakeNormal);
+}
+
+std::vector<ModelPart::IndexType> Define3DWakeProcess::CreateWakeSurfaceNodes(
+    IndexType& rNode_index,
+    array_1d<double, 3>& rCoordinates1,
+    array_1d<double, 3>& rCoordinates2,
+    array_1d<double, 3>& rCoordinates3,
+    array_1d<double, 3>& rCoordinates4) const
+{
+    const auto& p_node1 = mrStlWakeModelPart.CreateNewNode(
+        ++rNode_index, rCoordinates1[0], rCoordinates1[1], rCoordinates1[2]);
+    const auto& p_node2 = mrStlWakeModelPart.CreateNewNode(
+        ++rNode_index, rCoordinates2[0], rCoordinates2[1], rCoordinates2[2]);
+    const auto& p_node3 = mrStlWakeModelPart.CreateNewNode(
+        ++rNode_index, rCoordinates3[0], rCoordinates3[1], rCoordinates3[2]);
+    const auto& p_node4 = mrStlWakeModelPart.CreateNewNode(
+        ++rNode_index, rCoordinates4[0], rCoordinates4[1], rCoordinates4[2]);
+
+    return {p_node1->Id(), p_node2->Id(), p_node3->Id(), p_node4->Id()};
+}
+
+void Define3DWakeProcess::CreateWakeSurfaceElements(const double normal_projection,
+                                                    IndexType& rElement_index,
+                                                    const std::vector<ModelPart::IndexType>& rNodes_ids,
+                                                    const Properties::Pointer pElemProp) const
+{
+    if(normal_projection > 0.0){
+        const std::vector<ModelPart::IndexType> elemNodes1{rNodes_ids[0], rNodes_ids[1], rNodes_ids[2]};
+        const std::vector<ModelPart::IndexType> elemNodes2{rNodes_ids[0], rNodes_ids[3], rNodes_ids[2]};
+        mrStlWakeModelPart.CreateNewElement("Element3D3N", ++rElement_index, elemNodes1, pElemProp);
+        mrStlWakeModelPart.CreateNewElement("Element3D3N", ++rElement_index, elemNodes2, pElemProp);
+    }
+    else{
+        const std::vector<ModelPart::IndexType> elemNodes1{rNodes_ids[0], rNodes_ids[2], rNodes_ids[1]};
+        const std::vector<ModelPart::IndexType> elemNodes2{rNodes_ids[0], rNodes_ids[2], rNodes_ids[3]};
+        mrStlWakeModelPart.CreateNewElement("Element3D3N", ++rElement_index, elemNodes1, pElemProp);
+        mrStlWakeModelPart.CreateNewElement("Element3D3N", ++rElement_index, elemNodes2, pElemProp);
+    }
 }
 
 // This function checks which elements are cut by the wake and marks them as
@@ -311,8 +320,8 @@ void Define3DWakeProcess::MarkWakeElements()
         KRATOS_INFO("MarkWakeElements") << " Switching wake element distances!" << std::endl;
         wake_normal_switching_factor = -1.0;
     }
-    std::ofstream outfile_wake;
-    outfile_wake.open("wake_elements_process_id.txt");
+    // std::ofstream outfile_wake;
+    // outfile_wake.open("wake_elements_process_id.txt");
 
     block_for_each(root_model_part.Elements(), [&](Element& rElement)
     {
@@ -329,10 +338,10 @@ void Define3DWakeProcess::MarkWakeElements()
             // Save wake elements ids
             #pragma omp critical
             {
-                std::ofstream outfile_wake;
-                outfile_wake.open("wake_elements_process_id.txt", std::ios_base::app);
-                outfile_wake << rElement.Id();
-                outfile_wake << "\n";
+                // std::ofstream outfile_wake;
+                // outfile_wake.open("wake_elements_process_id.txt", std::ios_base::app);
+                // outfile_wake << rElement.Id();
+                // outfile_wake << "\n";
                 wake_elements_ordered_ids.push_back(rElement.Id());
             }
             // Save elemental distances in the element
