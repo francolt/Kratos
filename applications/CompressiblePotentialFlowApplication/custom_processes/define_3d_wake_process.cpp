@@ -241,19 +241,6 @@ void Define3DWakeProcess::CreateWakeSurfaceNodesAndElements(
     CreateWakeSurfaceElements(normal_projection, rElement_index, nodes_ids, pElemProp);
 }
 
-double Define3DWakeProcess::ComputeFaceNormalProjectionToWakeNormal(
-    array_1d<double, 3>& rCoordinates1,
-    array_1d<double, 3>& rCoordinates2,
-    array_1d<double, 3>& rCoordinates3,
-    array_1d<double, 3>& rCoordinates4) const
-{
-    const auto& side1 = rCoordinates2 - rCoordinates1;
-    const auto& side2 = rCoordinates3 - rCoordinates1;
-    array_1d<double, 3> face_normal = ZeroVector(3);
-    MathUtils<double>::CrossProduct(face_normal, side1, side2);
-    return inner_prod(face_normal, mWakeNormal);
-}
-
 std::vector<ModelPart::IndexType> Define3DWakeProcess::CreateWakeSurfaceNodes(
     IndexType& rNode_index,
     array_1d<double, 3>& rCoordinates1,
@@ -271,6 +258,19 @@ std::vector<ModelPart::IndexType> Define3DWakeProcess::CreateWakeSurfaceNodes(
         ++rNode_index, rCoordinates4[0], rCoordinates4[1], rCoordinates4[2]);
 
     return {p_node1->Id(), p_node2->Id(), p_node3->Id(), p_node4->Id()};
+}
+
+double Define3DWakeProcess::ComputeFaceNormalProjectionToWakeNormal(
+    array_1d<double, 3>& rCoordinates1,
+    array_1d<double, 3>& rCoordinates2,
+    array_1d<double, 3>& rCoordinates3,
+    array_1d<double, 3>& rCoordinates4) const
+{
+    const auto& side1 = rCoordinates2 - rCoordinates1;
+    const auto& side2 = rCoordinates3 - rCoordinates1;
+    array_1d<double, 3> face_normal = ZeroVector(3);
+    MathUtils<double>::CrossProduct(face_normal, side1, side2);
+    return inner_prod(face_normal, mWakeNormal);
 }
 
 void Define3DWakeProcess::CreateWakeSurfaceElements(const double normal_projection,
