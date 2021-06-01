@@ -193,11 +193,11 @@ class PotentialFlowTests(UnitTest.TestCase):
 
         with WorkFolderScope(work_folder):
             self._runTest(settings_file_name)
-            self._check_results(self.main_model_part.ProcessInfo[CPFApp.LIFT_COEFFICIENT], 1.8630755362266993, 0.0, 1e-9)
-            self._check_results(self.main_model_part.ProcessInfo[KratosMultiphysics.DRAG_COEFFICIENT], 0.14249264102207537, 0.0, 1e-9)
-            self._check_results(self.main_model_part.ProcessInfo[CPFApp.LIFT_COEFFICIENT_JUMP], 2.0611443995208223, 0.0, 1e-9)
-            self._check_results(self.main_model_part.ProcessInfo[CPFApp.LIFT_COEFFICIENT_FAR_FIELD], 0.2178937353533954, 0.0, 1e-9)
-            self._check_results(self.main_model_part.ProcessInfo[CPFApp.DRAG_COEFFICIENT_FAR_FIELD],0.16133718226915292, 0.0, 1e-9)
+            self._check_results(self.main_model_part.ProcessInfo[CPFApp.LIFT_COEFFICIENT], 1.8626195477185732, 0.0, 1e-9)
+            self._check_results(self.main_model_part.ProcessInfo[KratosMultiphysics.DRAG_COEFFICIENT], 0.1432468522277768, 0.0, 1e-9)
+            self._check_results(self.main_model_part.ProcessInfo[CPFApp.LIFT_COEFFICIENT_JUMP], 2.059409694484065, 0.0, 1e-9)
+            self._check_results(self.main_model_part.ProcessInfo[CPFApp.LIFT_COEFFICIENT_FAR_FIELD], 0.1188763930366672, 0.0, 1e-9)
+            self._check_results(self.main_model_part.ProcessInfo[CPFApp.DRAG_COEFFICIENT_FAR_FIELD],0.1869002606998323, 0.0, 1e-9)
 
     @UnitTest.skipIfApplicationsNotAvailable("ShapeOptimizationApplication", "LinearSolversApplication")
     def test_ShapeOptimizationLiftConstrainedBodyFitted2D(self):

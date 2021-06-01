@@ -217,7 +217,7 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         self.elem_id = 1
         if not self.shed_wake_from_trailing_edge:
             self.__ReadWakeStlModelFromFile()
-        # else: This is now implemented in cpp
+        # else: # This is now implemented in cpp
         #     self.__ShedWakeSurfaceFromTheTrailingEdge()
 
     def __ReadWakeStlModelFromFile(self):
