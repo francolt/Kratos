@@ -89,8 +89,7 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         self.count_elements_number = settings["count_elements_number"].GetBool()
         self.write_elements_ids_to_file = settings["write_elements_ids_to_file"].GetBool()
 
-        # For now plane wake surfaces are considered.
-        # TODO: Generalize this to curved wake surfaces
+        # This is a reference value for the wake normal
         self.wake_normal = settings["wake_normal"].GetVector()
         if( abs(DotProduct(self.wake_normal,self.wake_normal) - 1) > self.epsilon ):
             raise Exception('The wake normal should be a unitary vector')
@@ -112,7 +111,6 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         print('Executing __ShedWakeSurfaceFromTheTrailingEdge took ' + str(round(exe_time/60, 2)) + ' min')
 
         start_time = time.time()
-        self.shed_wake_from_trailing_edge = False
         print('shed_wake_from_trailing_edge = ', self.shed_wake_from_trailing_edge)
         print('wake_normal = ', self.wake_normal)
         CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file, self.shed_wake_from_trailing_edge).ExecuteInitialize()

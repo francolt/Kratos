@@ -64,6 +64,8 @@ void Define3DWakeProcess::ExecuteInitialize()
 
     ComputeWingLowerSurfaceNormals();
 
+    ComputeAndSaveLocalWakeNormal();
+
     KRATOS_WATCH(mShedWakeFromTrailingEdge)
     if(mShedWakeFromTrailingEdge){
         ShedWakeSurfaceFromTheTrailingEdge();
@@ -74,6 +76,8 @@ void Define3DWakeProcess::ExecuteInitialize()
     RecomputeComputeNodalDistancesToWakeOrWingLowerSurface();
 
     MarkKuttaElements();
+
+    SaveLocalWakeNormalInElements();
 
     AddWakeNodesToWakeModelPart();
 
@@ -136,11 +140,31 @@ void Define3DWakeProcess::InitializeWakeSubModelpart() const
     }
 }
 
-void Define3DWakeProcess::MarkTrailingEdgeNodes() const
+void Define3DWakeProcess::MarkTrailingEdgeNodes()
 {
+    double max_span_position = std::numeric_limits<double>::lowest();
+    double min_span_position = std::numeric_limits<double>::max();
+
+    auto p_right_wing_tip_node = &*mrTrailingEdgeModelPart.NodesBegin();
+    auto p_left_wing_tip_node = &*mrTrailingEdgeModelPart.NodesBegin();
+
     for (auto& r_node : mrTrailingEdgeModelPart.Nodes()) {
         r_node.SetValue(TRAILING_EDGE, true);
+        const auto& r_coordinates = r_node.Coordinates();
+        const double distance_projection = inner_prod(r_coordinates, mSpanDirection);
+
+        if(distance_projection > max_span_position){
+            p_right_wing_tip_node = &r_node;
+            max_span_position = distance_projection;
+        }
+        if(distance_projection < min_span_position){
+            p_left_wing_tip_node = &r_node;
+            min_span_position = distance_projection;
+        }
     }
+
+    p_right_wing_tip_node->SetValue(WING_TIP, true);
+    p_left_wing_tip_node->SetValue(WING_TIP, true);
 }
 
 // This function computes the wing lower surface normals and marks the upper and
@@ -187,6 +211,44 @@ void Define3DWakeProcess::ComputeWingLowerSurfaceNormals() const
     }
 }
 
+void Define3DWakeProcess::ComputeAndSaveLocalWakeNormal() const
+{
+    // If mrTrailingEdgeModelPart doesn't have conditions use the global wake normal
+    if(mrTrailingEdgeModelPart.NumberOfConditions() < 1){
+        // Use global wake normal
+        for (auto& r_node : mrTrailingEdgeModelPart.Nodes()){
+            r_node.SetValue(WAKE_NORMAL, mWakeNormal);
+        }
+    }
+    else{
+        for (auto& r_cond : mrTrailingEdgeModelPart.Conditions()){
+            auto& r_geometry = r_cond.GetGeometry();
+            const auto& coordinates1 = r_geometry[0].Coordinates();
+            const auto& coordinates2 = r_geometry[1].Coordinates();
+
+            const auto& local_span_direction = coordinates2 - coordinates1;
+            array_1d<double, 3> local_wake_normal = ZeroVector(3);
+            MathUtils<double>::CrossProduct(local_wake_normal, mWakeDirection, local_span_direction);
+
+            const double projection = inner_prod(local_wake_normal, mWakeNormal);
+
+            if(projection < 0.0){
+                local_wake_normal *= -1.0;
+            }
+
+            for (unsigned int i = 0; i < r_geometry.size(); i++){
+                r_geometry[i].GetValue(WAKE_NORMAL) += local_wake_normal;
+            }
+        }
+
+        for (auto& r_node: mrTrailingEdgeModelPart.Nodes()){
+            auto& local_wake_normal = r_node.GetValue(WAKE_NORMAL);
+            const double norm = MathUtils<double>::Norm3(local_wake_normal);
+            local_wake_normal /= norm;
+        }
+    }
+}
+
 void Define3DWakeProcess::ShedWakeSurfaceFromTheTrailingEdge() const
 {
     const Properties::Pointer pElemProp = mrStlWakeModelPart.pGetProperties(0);
@@ -207,8 +269,32 @@ void Define3DWakeProcess::ShedWakeSurfaceFromTheTrailingEdge() const
         const auto& r_geometry = r_cond.GetGeometry();
         coordinates1 = r_geometry[0].Coordinates();
         coordinates2 = r_geometry[1].Coordinates();
+
+        if(r_geometry[0].GetValue(WING_TIP) != 0){
+            const auto& side = coordinates1 - coordinates2;
+            const double projection = inner_prod(side, mSpanDirection);
+
+            if(projection > 0.0){
+                coordinates1 -= 1e-6 * side;
+            }
+            else{
+                coordinates1 += 1e-6 * side;
+            }
+        }
+        else if(r_geometry[1].GetValue(WING_TIP) != 0){
+            const auto& side = coordinates2 - coordinates1;
+            const double projection = inner_prod(side, mSpanDirection);
+
+            if(projection > 0.0){
+                coordinates2 -= 1e-6 * side;
+            }
+            else{
+                coordinates2 += 1e-6 * side;
+            }
+        }
         coordinates3 = coordinates1 + element_size * mWakeDirection;
         coordinates4 = coordinates2 + element_size * mWakeDirection;
+
 
         CreateWakeSurfaceNodesAndElements(node_index, coordinates1, coordinates2, coordinates3,
                                    coordinates4, element_index, pElemProp);
@@ -491,7 +577,8 @@ void Define3DWakeProcess::RecomputeComputeNodalDistancesToWakeOrWingLowerSurface
             // distance is computed according to the wake normal
             else{
                 // TO DISCUSS: For curved trailing edges it makes sense to use the local wake normal
-                double distance = inner_prod(distance_vector, mWakeNormal);
+                const auto& local_wake_normal = p_closest_te_node->GetValue(WAKE_NORMAL);
+                double distance = inner_prod(distance_vector, local_wake_normal);
                 // Nodes slightly below and above the wake are given a positive distance (wake down)
                 if(std::abs(distance) < mTolerance){
                     distance = mTolerance;
@@ -499,6 +586,32 @@ void Define3DWakeProcess::RecomputeComputeNodalDistancesToWakeOrWingLowerSurface
                 r_node.SetValue(WAKE_DISTANCE, distance);
             }
         }
+    }
+}
+
+void Define3DWakeProcess::SaveLocalWakeNormalInElements() const
+{
+    ModelPart& root_model_part = mrBodyModelPart.GetRootModelPart();
+    ModelPart& wake_sub_model_part = root_model_part.GetSubModelPart("wake_elements_model_part");
+
+
+    for (auto& r_elem : wake_sub_model_part.Elements()){
+        auto p_closest_te_node = &*mrTrailingEdgeModelPart.NodesBegin();
+        double min_distance_to_te = std::numeric_limits<double>::max();
+        for (auto& r_te_node : mrTrailingEdgeModelPart.Nodes()){
+            const auto& distance_vector = r_elem.GetGeometry().Center() - r_te_node;
+            const double distance_to_te = inner_prod(distance_vector, distance_vector);
+            if (distance_to_te < min_distance_to_te){
+                min_distance_to_te = distance_to_te;
+                p_closest_te_node = &r_te_node;
+            }
+        }
+
+        if(r_elem.Id() == 590477){
+            KRATOS_WATCH(p_closest_te_node->Id())
+        }
+
+        r_elem.GetValue(WAKE_NORMAL) = p_closest_te_node->GetValue(WAKE_NORMAL);
     }
 }
 
@@ -586,56 +699,6 @@ void Define3DWakeProcess::MarkKuttaElements()
     wake_sub_model_part.AddElements(wake_elements_ordered_ids);
     wake_sub_model_part.RemoveElements(TO_ERASE);
     KRATOS_INFO("MarkKuttaElements") << "...Selecting kutta elements finished..." << std::endl;
-}
-
-// This function computes the distances from the current element non trailing
-// edge nodes to the wake or to the wing lower surface, depending whether the
-// node is behind or in front of the trailing edge according to the wake
-// direction (free stream velocity direction).
-void Define3DWakeProcess::ComputeNodalDistancesToWakeOrWingLowerSurface(const Element::GeometryType& rGeom, NodeType::Pointer pTrailingEdgeNode, Vector& rNodalDistancesToTe) const
-{
-    unsigned int counter = 0;
-    for (unsigned int i = 0; i < rGeom.size(); i++){
-        const auto& r_node = rGeom[i];
-        if (!r_node.GetValue(TRAILING_EDGE)){
-            // Compute the distance vector from the selected trailing edge node to the current node
-            const array_1d<double,3> distance_vector = r_node.Coordinates() - pTrailingEdgeNode->Coordinates();
-
-            // Compute the distance in the free stream direction
-            const double free_stream_direction_distance = inner_prod(distance_vector, mWakeDirection);
-
-            double distance;
-            // Nodes in the lower surface are directly assigned a negative distance
-            if(r_node.GetValue(LOWER_SURFACE)){
-                distance = - mTolerance;
-            }
-            // Nodes in the upper surface are directly assigned a positive distance
-            else if(r_node.GetValue(UPPER_SURFACE)){
-                distance = mTolerance;
-            }
-            //  For the nodes in front of the selected trailing edge node, the
-            //  distance is computed according to the lower surface normal
-            else if(free_stream_direction_distance < 0.0){
-                distance = inner_prod(distance_vector, pTrailingEdgeNode->GetValue(NORMAL));
-                // Nodes under the wing are given a negative distance
-                if(std::abs(distance) < mTolerance){
-                    distance = - mTolerance;
-                }
-            }
-            // For the nodes behind of the selected trailing edge node, the
-            // distance is computed according to the wake normal
-            else
-            {
-                distance = inner_prod(distance_vector, mWakeNormal);
-                // Nodes slightly below and above the wake are given a positive distance (wake down)
-                if(std::abs(distance) < mTolerance){
-                    distance = mTolerance;
-                }
-            }
-            rNodalDistancesToTe[counter] = distance;
-            counter += 1;
-        }
-    }
 }
 
 void Define3DWakeProcess::AddWakeNodesToWakeModelPart() const

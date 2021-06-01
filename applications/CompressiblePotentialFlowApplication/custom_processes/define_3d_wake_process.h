@@ -108,6 +108,7 @@ private:
     const Vector& mWakeNormal;
     BoundedVector<double, 3> mWakeDirection;
     BoundedVector<double, 3> mSpanDirection;
+
     bool mSwitchWakeDirection;
     bool mCountElementsNumber;
     bool mWriteElementsIdsToFile;
@@ -127,9 +128,11 @@ private:
 
     void InitializeWakeSubModelpart() const;
 
-    void MarkTrailingEdgeNodes() const;
+    void MarkTrailingEdgeNodes();
 
     void ComputeWingLowerSurfaceNormals() const;
+
+    void ComputeAndSaveLocalWakeNormal() const;
 
     void ShedWakeSurfaceFromTheTrailingEdge() const;
 
@@ -168,7 +171,7 @@ private:
 
     void MarkKuttaElements();
 
-    void ComputeNodalDistancesToWakeOrWingLowerSurface(const Element::GeometryType& rGeom, NodeType::Pointer pTrailingEdgeNode, Vector& rNodalDistancesToTe) const;
+    void SaveLocalWakeNormalInElements() const;
 
     void AddWakeNodesToWakeModelPart() const;
 
