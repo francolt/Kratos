@@ -33,6 +33,8 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
             "model_part_name": "",
             "body_model_part_name": "",
             "shed_wake_from_trailing_edge": false,
+            "shedded_wake_distance": 12.5,
+            "shedded_wake_element_size": 0.2,
             "wake_stl_file_name" : "",
             "switch_wake_stl_normal" : false,
             "wake_normal": [0.0,0.0,1.0],
@@ -78,6 +80,8 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         self.switch_wake_stl_normal = settings["switch_wake_stl_normal"].GetBool()
         self.count_elements_number = settings["count_elements_number"].GetBool()
         self.write_elements_ids_to_file = settings["write_elements_ids_to_file"].GetBool()
+        self.shedded_wake_distance = settings["shedded_wake_distance"].GetDouble()
+        self.shedded_wake_element_size = settings["shedded_wake_element_size"].GetDouble()
 
         # This is a reference value for the wake normal
         self.wake_normal = settings["wake_normal"].GetVector()
@@ -100,7 +104,8 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
             'DefineWakeProcess3D', 'Executing __CreateWakeModelPart took ', round(exe_time/60, 2), ' min')
 
         start_time = time.time()
-        CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file, self.shed_wake_from_trailing_edge).ExecuteInitialize()
+        CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal, self.wake_direction, self.switch_wake_stl_normal,
+                                   self.count_elements_number, self.write_elements_ids_to_file, self.shed_wake_from_trailing_edge, self.shedded_wake_distance, self.shedded_wake_element_size).ExecuteInitialize()
         exe_time = time.time() - start_time
         KratosMultiphysics.Logger.PrintInfo(
             'DefineWakeProcess3D', 'Executing Define3DWakeProcess took ', round(exe_time, 2), ' sec')
@@ -202,16 +207,14 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
 
     def __ShedWakeSurfaceFromTheTrailingEdge(self):
         KratosMultiphysics.Logger.PrintInfo('DefineWakeProcess3D', 'Shedding wake from trailing edge')
-        shedded_distance = 12.5
-        size = 0.2
-        number_of_elements_in_wake_direction = int(shedded_distance/size)
+        number_of_elements_in_wake_direction = int(self.shedded_wake_distance/self.shedded_wake_element_size)
         z = 1e-9
 
         for condition in self.trailing_edge_model_part.Conditions:
             vertex1 = condition.GetNodes()[0]
             vertex2 = condition.GetNodes()[1]
-            vertex3 = vertex1 + size * self.wake_direction
-            vertex4 = vertex2 + size * self.wake_direction
+            vertex3 = vertex1 + self.shedded_wake_element_size * self.wake_direction
+            vertex4 = vertex2 + self.shedded_wake_element_size * self.wake_direction
 
             node1 = self.__AddNodeToWakeModelPart(vertex1.X,   vertex1.Y, vertex1.Z + z)
             node2 = self.__AddNodeToWakeModelPart(vertex2.X,   vertex2.Y, vertex2.Z + z)

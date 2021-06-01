@@ -51,7 +51,9 @@ public:
                         const bool SwitchWakeDirection,
                         const bool CountElementsNumber,
                         const bool WriteElementsIdsToFile,
-                        const bool ShedWakeFromTrailingEdge);
+                        const bool ShedWakeFromTrailingEdge,
+                        const double SheddedWakeDistance,
+                        const double SheddedWakeElementSize);
 
     /// Copy constructor.
     Define3DWakeProcess(Define3DWakeProcess const& rOther) = delete;
@@ -114,6 +116,9 @@ private:
     bool mWriteElementsIdsToFile;
     bool mShedWakeFromTrailingEdge;
 
+    const double mSheddedWakeDistance;
+    const double mSheddedWakeElementSize;
+
     // Vector to store the trailing edge elements ids
     std::vector<std::size_t> mTrailingEdgeElementsOrderedIds;
     std::vector<std::size_t> mTrailingEdgeElementsNodesOrderedIds;
@@ -134,7 +139,10 @@ private:
 
     void ComputeAndSaveLocalWakeNormal() const;
 
-    void ShedWakeSurfaceFromTheTrailingEdge() const;
+    void ShedWakeSurfaceFromTheTrailingEdge();
+
+    void DecreaseWakeWidthAtTheWingTips(array_1d<double, 3>& rPoint1,
+                                        array_1d<double, 3>& rPoint2);
 
     void CreateWakeSurfaceNodesAndElements(IndexType& rNode_index,
                                            const array_1d<double, 3>& rCoordinates1,
@@ -168,6 +176,12 @@ private:
     void AddTrailingEdgeAndWakeElements(std::vector<std::size_t>& rWakeElementsOrderedIds);
 
     void RecomputeComputeNodalDistancesToWakeOrWingLowerSurface();
+
+    void FindClosestTrailingEdgeNode(NodeType::Pointer& pClosest_te_node,
+                                     const array_1d<double, 3>& rPoint) const;
+
+    void RecomputeDistance(NodeType::Pointer& pClosest_te_node,
+                           NodeType& rNode) const;
 
     void MarkKuttaElements();
 
