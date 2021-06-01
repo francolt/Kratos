@@ -115,6 +115,7 @@ private:
 
     // Vector to store the trailing edge elements ids
     std::vector<std::size_t> mTrailingEdgeElementsOrderedIds;
+    std::vector<std::size_t> mTrailingEdgeElementsNodesOrderedIds;
 
     NodeType* mpTrailingEdgeNode;
     BoundedVector<double, 3> mWakeNormalOld;
@@ -133,24 +134,24 @@ private:
     void ShedWakeSurfaceFromTheTrailingEdge() const;
 
     void CreateWakeSurfaceNodesAndElements(IndexType& rNode_index,
-                                           array_1d<double, 3>& rCoordinates1,
-                                           array_1d<double, 3>& rCoordinates2,
-                                           array_1d<double, 3>& rCoordinates3,
-                                           array_1d<double, 3>& rCoordinates4,
+                                           const array_1d<double, 3>& rCoordinates1,
+                                           const array_1d<double, 3>& rCoordinates2,
+                                           const array_1d<double, 3>& rCoordinates3,
+                                           const array_1d<double, 3>& rCoordinates4,
                                            IndexType& rElement_index,
                                            const Properties::Pointer pElemProp) const;
 
     std::vector<ModelPart::IndexType> CreateWakeSurfaceNodes(
         IndexType& rNode_index,
-        array_1d<double, 3>& rCoordinates1,
-        array_1d<double, 3>& rCoordinates2,
-        array_1d<double, 3>& rCoordinates3,
-        array_1d<double, 3>& rCoordinates4) const;
+        const array_1d<double, 3>& rCoordinates1,
+        const array_1d<double, 3>& rCoordinates2,
+        const array_1d<double, 3>& rCoordinates3,
+        const array_1d<double, 3>& rCoordinates4) const;
 
-    double ComputeFaceNormalProjectionToWakeNormal(array_1d<double, 3>& rCoordinates1,
-                                                   array_1d<double, 3>& rCoordinates2,
-                                                   array_1d<double, 3>& rCoordinates3,
-                                                   array_1d<double, 3>& rCoordinates4) const;
+    double ComputeFaceNormalProjectionToWakeNormal(const array_1d<double, 3>& rCoordinates1,
+                                                   const array_1d<double, 3>& rCoordinates2,
+                                                   const array_1d<double, 3>& rCoordinates3,
+                                                   const array_1d<double, 3>& rCoordinates4) const;
 
     void CreateWakeSurfaceElements(const double normal_projection,
                                    IndexType& rElement_index,
@@ -162,6 +163,8 @@ private:
     void CheckIfTrailingEdgeElement(Element& rElement, Geometry<NodeType>& rGeometry);
 
     void AddTrailingEdgeAndWakeElements(std::vector<std::size_t>& rWakeElementsOrderedIds);
+
+    void RecomputeComputeNodalDistancesToWakeOrWingLowerSurface();
 
     void MarkKuttaElements();
 
