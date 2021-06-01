@@ -112,7 +112,7 @@ class DefineWakeProcess3D(KratosMultiphysics.Process):
         print('Executing __ShedWakeSurfaceFromTheTrailingEdge took ' + str(round(exe_time/60, 2)) + ' min')
 
         start_time = time.time()
-        self.shed_wake_from_trailing_edge = True
+        self.shed_wake_from_trailing_edge = False
         print('shed_wake_from_trailing_edge = ', self.shed_wake_from_trailing_edge)
         CPFApp.Define3DWakeProcess(self.trailing_edge_model_part, self.body_model_part, self.wake_model_part, self.epsilon, self.wake_normal,self.wake_direction,self.switch_wake_stl_normal, self.count_elements_number, self.write_elements_ids_to_file, self.shed_wake_from_trailing_edge).ExecuteInitialize()
         exe_time = time.time() - start_time
