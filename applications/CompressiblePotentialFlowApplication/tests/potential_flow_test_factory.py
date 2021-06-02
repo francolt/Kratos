@@ -304,7 +304,7 @@ class PotentialFlowTests(UnitTest.TestCase):
         potential_flow_analysis.Initialize()
         if not initialize_only:
             potential_flow_analysis.RunSolutionLoop()
-        potential_flow_analysis.Finalize()
+            potential_flow_analysis.Finalize()
         self.main_model_part = model.GetModelPart(settings["solver_settings"]["model_part_name"].GetString())
 
     def _check_results(self, result, reference, rel_tol, abs_tol):

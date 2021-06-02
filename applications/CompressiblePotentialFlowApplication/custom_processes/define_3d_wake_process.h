@@ -133,7 +133,7 @@ private:
 
     void InitializeWakeSubModelpart() const;
 
-    void MarkTrailingEdgeNodes();
+    void MarkTrailingEdgeNodesAndFindWingtipNodes();
 
     void ComputeWingLowerSurfaceNormals() const;
 
@@ -142,7 +142,7 @@ private:
     void ShedWakeSurfaceFromTheTrailingEdge();
 
     void DecreaseWakeWidthAtTheWingTips(array_1d<double, 3>& rPoint1,
-                                        array_1d<double, 3>& rPoint2);
+                                        const array_1d<double, 3>& rPoint2);
 
     void CreateWakeSurfaceNodesAndElements(IndexType& rNode_index,
                                            const array_1d<double, 3>& rCoordinates1,
@@ -175,17 +175,30 @@ private:
 
     void AddTrailingEdgeAndWakeElements(std::vector<std::size_t>& rWakeElementsOrderedIds);
 
-    void RecomputeComputeNodalDistancesToWakeOrWingLowerSurface();
-
     void FindClosestTrailingEdgeNode(NodeType::Pointer& pClosest_te_node,
                                      const array_1d<double, 3>& rPoint) const;
+
+    void RecomputeComputeNodalDistancesToWakeOrWingLowerSurface();
 
     void RecomputeDistance(NodeType::Pointer& pClosest_te_node,
                            NodeType& rNode) const;
 
     void MarkKuttaElements();
 
-    void SaveLocalWakeNormalInElements() const;
+    unsigned int CountNumberOfTrailindEdgeNodesInElement(const Geometry<NodeType>& rGeometry) const;
+
+    void CountNumberOfPositiveAndNegativeDistances(
+        const Geometry<NodeType>& rGeometry,
+        unsigned int& number_of_nodes_with_negative_distance,
+        unsigned int& number_of_nodes_with_positive_distance) const;
+
+    void SelectElementType(Element& rElement,
+                           const Geometry<NodeType>& rGeometry,
+                           const unsigned int number_of_te_nodes,
+                           const unsigned int number_of_nodes_with_negative_distance,
+                           const unsigned int number_of_nodes_with_positive_distance) const;
+
+        void SaveLocalWakeNormalInElements() const;
 
     void AddWakeNodesToWakeModelPart() const;
 
