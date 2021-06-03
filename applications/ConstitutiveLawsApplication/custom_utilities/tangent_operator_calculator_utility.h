@@ -298,6 +298,9 @@ public:
         // We check that the perturbation has a threshold value of PerturbationThreshold
         if (ConsiderPertubationThreshold && pertubation < PerturbationThreshold) pertubation = PerturbationThreshold;
 
+        pertubation = 1E-8;
+        const double back_up = pertubation;
+
         // Loop over components of the strain
         Vector& r_perturbed_strain = rValues.GetStrainVector();
         Vector& r_perturbed_integrated_stress = rValues.GetStressVector();
@@ -329,6 +332,8 @@ public:
         } else if (ApproximationOrder == 2) {
             for (IndexType i_component = 0; i_component < size1; ++i_component) {
                 for (IndexType j_component = i_component; j_component < size2; ++j_component) {
+                    if (i_component !=  j_component)
+                        pertubation /= 10.0;
                     // Apply the perturbation (positive)
                     PerturbateDeformationGradient(r_perturbed_deformation_gradient, unperturbed_deformation_gradient_gp, pertubation, i_component, j_component);
 
@@ -362,6 +367,7 @@ public:
                     noalias(r_perturbed_integrated_stress) = unperturbed_stress_vector_gp;
                     noalias(r_perturbed_deformation_gradient) = unperturbed_deformation_gradient_gp;
                     r_perturbed_det_deformation_gradient = det_unperturbed_deformation_gradient_gp;
+                    pertubation = back_up;
                 }
             }
         }

@@ -160,7 +160,7 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::CalculateMa
                 r_constitutive_matrix, rValues, characteristic_length,
                 plastic_strain, back_stress_vector);
 
-            if (F <= std::abs(1.0e-4 * threshold)) { // Elastic case
+            if (F <= std::abs(1.0e-4 * threshold) || r_current_process_info[ACTIVE_SET_CONVERGED] == false) { // Elastic case
                 noalias(r_integrated_stress_vector) = predictive_stress_vector;
             } else { // Plastic case
                 // While loop backward euler
