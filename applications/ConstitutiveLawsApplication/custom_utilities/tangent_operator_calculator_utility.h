@@ -321,7 +321,7 @@ public:
 
                     // Finally we compute the components
                     const IndexType voigt_index = CalculateVoigtIndex(delta_stress.size(), i_component, j_component);
-                    CalculateComponentsToTangentTensorFirstOrder(auxiliar_tensor, r_perturbed_strain, delta_stress, voigt_index);
+                    CalculateComponentsToTangentTensorFirstOrder(auxiliar_tensor, r_perturbed_strain-unperturbed_strain_vector_gp, delta_stress, voigt_index);
 
                     // Reset the values to the initial ones
                     noalias(r_perturbed_integrated_stress) = unperturbed_stress_vector_gp;
@@ -368,6 +368,48 @@ public:
                     noalias(r_perturbed_deformation_gradient) = unperturbed_deformation_gradient_gp;
                     r_perturbed_det_deformation_gradient = det_unperturbed_deformation_gradient_gp;
                     pertubation = back_up;
+                }
+            }
+        } else if (ApproximationOrder == 4) {
+            for (IndexType i_component = 0; i_component < size1; ++i_component) {
+                for (IndexType j_component = i_component; j_component < size2; ++j_component) {
+                    // Apply the perturbation (positive)
+                    PerturbateDeformationGradient(r_perturbed_deformation_gradient, unperturbed_deformation_gradient_gp, pertubation, i_component, j_component);
+
+                    // We continue with the calculations
+                    IntegratePerturbedStrain(rValues, pConstitutiveLaw, rStressMeasure);
+
+                    // Compute stress (plus)
+                    const Vector strain_plus = r_perturbed_strain;
+                    const Vector stress_plus = r_perturbed_integrated_stress;
+
+                    // Reset the values to the initial ones
+                    r_perturbed_det_deformation_gradient = det_unperturbed_deformation_gradient_gp;
+                    noalias(r_perturbed_integrated_stress) = unperturbed_stress_vector_gp;
+                    noalias(r_perturbed_deformation_gradient) = unperturbed_deformation_gradient_gp;
+
+                    // Apply the perturbation twice
+                    PerturbateDeformationGradient(r_perturbed_deformation_gradient, unperturbed_deformation_gradient_gp, 2.0*pertubation, i_component, j_component);
+
+                    // We continue with the calculations
+                    IntegratePerturbedStrain(rValues, pConstitutiveLaw, rStressMeasure);
+
+                    // Compute stress (minus)
+                    const Vector strain_2_plus = r_perturbed_strain;
+                    const Vector stress_2_plus = r_perturbed_integrated_stress;
+
+                    const IndexType voigt_index = CalculateVoigtIndex(stress_plus.size(), i_component, j_component);
+
+                    // Finally we compute the components
+                    const SizeType voigt_size = stress_plus.size();
+                    for (IndexType row = 0; row < voigt_size; ++row) {
+                        auxiliar_tensor(row, voigt_index) = (stress_plus[row] - unperturbed_stress_vector_gp[row]) / pertubation - (stress_2_plus[row] - 2.0 * stress_plus[row] + unperturbed_stress_vector_gp[row]) / (2.0 * pertubation);
+                    }
+
+                    // Reset the values to the initial ones
+                    noalias(r_perturbed_integrated_stress) = unperturbed_stress_vector_gp;
+                    noalias(r_perturbed_deformation_gradient) = unperturbed_deformation_gradient_gp;
+                    r_perturbed_det_deformation_gradient = det_unperturbed_deformation_gradient_gp;
                 }
             }
         }
