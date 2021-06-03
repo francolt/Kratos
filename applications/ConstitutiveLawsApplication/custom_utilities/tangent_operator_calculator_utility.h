@@ -174,7 +174,7 @@ public:
 
                 // Compute tangent moduli
                 const Vector delta_stress = r_perturbed_integrated_stress - unperturbed_stress_vector_gp;
-                CalculateComponentsToTangentTensorFirstOrder(auxiliar_tensor, r_perturbed_strain-unperturbed_strain_vector_gp, delta_stress, i_component);
+                CalculateComponentsToTangentTensorFirstOrder(auxiliar_tensor, pertubation, delta_stress, i_component);
 
                 // Reset the values to the initial ones
                 noalias(r_perturbed_strain) = unperturbed_strain_vector_gp;
@@ -286,7 +286,7 @@ public:
         const std::size_t size1 = unperturbed_deformation_gradient_gp.size1();
         const std::size_t size2 = unperturbed_deformation_gradient_gp.size2();
 
-        KRATOS_ERROR_IF_NOT(ApproximationOrder == 1 || ApproximationOrder == 2) << "The approximation order for the perturbation is " << ApproximationOrder << ". Options are 1 and 2" << std::endl;
+        KRATOS_ERROR_IF_NOT(ApproximationOrder == 1 || ApproximationOrder == 2 || ApproximationOrder == 4) << "The approximation order for the perturbation is " << ApproximationOrder << ". Options are 1 and 2" << std::endl;
 
         // Calculate the perturbation
         double pertubation = PerturbationThreshold;
@@ -321,7 +321,7 @@ public:
 
                     // Finally we compute the components
                     const IndexType voigt_index = CalculateVoigtIndex(delta_stress.size(), i_component, j_component);
-                    CalculateComponentsToTangentTensorFirstOrder(auxiliar_tensor, r_perturbed_strain-unperturbed_strain_vector_gp, delta_stress, voigt_index);
+                    CalculateComponentsToTangentTensorFirstOrder(auxiliar_tensor, pertubation, delta_stress, voigt_index);
 
                     // Reset the values to the initial ones
                     noalias(r_perturbed_integrated_stress) = unperturbed_stress_vector_gp;
@@ -403,7 +403,8 @@ public:
                     // Finally we compute the components
                     const SizeType voigt_size = stress_plus.size();
                     for (IndexType row = 0; row < voigt_size; ++row) {
-                        auxiliar_tensor(row, voigt_index) = (stress_plus[row] - unperturbed_stress_vector_gp[row]) / pertubation - (stress_2_plus[row] - 2.0 * stress_plus[row] + unperturbed_stress_vector_gp[row]) / (2.0 * pertubation);
+                        auxiliar_tensor(row, voigt_index) = (stress_plus[row] - unperturbed_stress_vector_gp[row]) / pertubation - 
+                            (stress_2_plus[row] - 2.0 * stress_plus[row] + unperturbed_stress_vector_gp[row]) / (2.0 * pertubation);
                     }
 
                     // Reset the values to the initial ones
@@ -722,15 +723,14 @@ private:
      */
     static void CalculateComponentsToTangentTensorFirstOrder(
         Matrix& rTangentTensor,
-        const Vector& rVectorStrain,
+        const double Perturbation,
         const Vector& rDeltaStress,
         const IndexType Component
         )
     {
-        const double perturbation = rVectorStrain[Component];
         const SizeType voigt_size = rDeltaStress.size();
         for (IndexType row = 0; row < voigt_size; ++row) {
-            rTangentTensor(row, Component) = rDeltaStress[row] / perturbation;
+            rTangentTensor(row, Component) = rDeltaStress[row] / Perturbation;
         }
     }
 
