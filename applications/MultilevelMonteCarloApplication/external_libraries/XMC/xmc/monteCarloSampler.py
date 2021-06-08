@@ -517,8 +517,6 @@ class MonteCarloSampler:
                 self.batchIndices[batch][level].costEstimator,
                 *self.batchIndices[batch][level].qoiEstimator,
             )
-            # Update model coefficients for cost, bias, variance with new observations
-            self.updatePredictors()
 
         for level in range(len(self.indices)):
             # synchronize estimator needed for checking convergence and updating hierarchy
@@ -528,6 +526,9 @@ class MonteCarloSampler:
             self.indices[level].costEstimator = get_value_from_remote(
                 self.indices[level].costEstimator
             )
+
+        # Update model coefficients for cost, bias, variance with new observations
+        self.updatePredictors()
 
     def asynchronousUpdate(self, newHierarchy):
         """

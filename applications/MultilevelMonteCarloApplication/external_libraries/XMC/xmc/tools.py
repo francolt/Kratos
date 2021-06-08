@@ -297,3 +297,14 @@ def flatten(sequence):
             yield from flatten(element)
         else:
             yield element
+
+@task(keep=True, returns=1)
+def abs_Task(value: float) -> float:
+    """Task function returning absolute value."""
+    return abs(value)
+
+
+@task(keep=True, returns=1)
+def multiplyByScalar_Task(value: float, scalar: float) -> float:
+    """Task function returning the product between two scalars."""
+    return value * scalar
