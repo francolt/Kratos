@@ -1,5 +1,6 @@
 # Importing the Kratos Library
 import KratosMultiphysics
+import KratosMultiphysics.MultilevelMonteCarloApplication
 import KratosMultiphysics.CompressiblePotentialFlowApplication as CPFApp
 
 # Import KratosUnittest
