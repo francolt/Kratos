@@ -64,8 +64,8 @@
     },
     "solverWrapperInputDictionary": {
         "adaptiveRefinementJumpToFinestLevel": false,
-        "analysisStage": "applications.MultilevelMonteCarloApplication.tests.caarc_wind_mpi.simulation_definition.SimulationScenario",
-	"asynchronous": false,
+        "analysisStage": "applications.MultilevelMonteCarloApplication.tests.poisson_square_2d.simulation_definition.SimulationScenario",
+	    "asynchronous": false,
         "fakeRandomVariable": [0.15],
         "index": [],
         "mappingOutputQuantities": false,
