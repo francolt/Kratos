@@ -218,7 +218,7 @@ class PotentialFlowTests(UnitTest.TestCase):
     def test_StochasticShapeOptimizationLiftConstrainedBodyFitted2D(self):
        # if not is_xmc_available:
         #    self.skipTest("XMC and its dependencies could not be imported. Please check applications/MultilevelMonteCarloApplication/README.md for installation details")
-
+        import KratosMultiphysics.MultilevelMonteCarloApplication
         work_folder = "stochastic_body_fitted_opt"
 
         with UnitTest.WorkFolderScope(work_folder, __file__):
