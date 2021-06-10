@@ -1,6 +1,5 @@
 # Importing the Kratos Library
 import KratosMultiphysics
-import KratosMultiphysics.MultilevelMonteCarloApplication
 import KratosMultiphysics.CompressiblePotentialFlowApplication as CPFApp
 
 # Import KratosUnittest
@@ -20,6 +19,7 @@ except:
     numpy_stl_is_available = False
 
 try:
+    import KratosMultiphysics.MultilevelMonteCarloApplication
     import xmc
     import exaqute
     import numpy as np
@@ -219,7 +219,6 @@ class PotentialFlowTests(UnitTest.TestCase):
     def test_StochasticShapeOptimizationLiftConstrainedBodyFitted2D(self):
        # if not is_xmc_available:
         #    self.skipTest("XMC and its dependencies could not be imported. Please check applications/MultilevelMonteCarloApplication/README.md for installation details")
-        import KratosMultiphysics.MultilevelMonteCarloApplication
         work_folder = "stochastic_body_fitted_opt"
 
         with UnitTest.WorkFolderScope(work_folder, __file__):
