@@ -215,9 +215,9 @@ class PotentialFlowTests(UnitTest.TestCase):
         with UnitTest.WorkFolderScope(work_folder, __file__):
             __import__(work_folder+".run_test")
 
-   @UnitTest.skipIfApplicationsNotAvailable("ShapeOptimizationApplication", "LinearSolversApplication", "MeshMovingApplication", "MultilevelMonteCarloApplication")
+    @UnitTest.skipIfApplicationsNotAvailable("ShapeOptimizationApplication", "LinearSolversApplication", "MeshMovingApplication", "MultilevelMonteCarloApplication")
     def test_StochasticShapeOptimizationLiftConstrainedBodyFitted2D(self):
-       if not is_xmc_available:
+        if not is_xmc_available:
            self.skipTest("XMC and its dependencies could not be imported. Please check applications/MultilevelMonteCarloApplication/README.md for installation details")
         work_folder = "stochastic_body_fitted_opt"
 
