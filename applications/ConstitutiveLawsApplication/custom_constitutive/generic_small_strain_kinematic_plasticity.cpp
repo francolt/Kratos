@@ -160,7 +160,7 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::CalculateMa
                 r_constitutive_matrix, rValues, characteristic_length,
                 plastic_strain, back_stress_vector);
 
-            if (F <= std::abs(1.0e-4 * threshold) || r_current_process_info[RESIDUAL_NORM] > 1E-4) { // Elastic case
+            if (F <= std::abs(1.0e-4 * threshold)) { // Elastic case
                 noalias(r_integrated_stress_vector) = predictive_stress_vector;
             } else { // Plastic case
                 // While loop backward euler
@@ -175,7 +175,8 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::CalculateMa
 
                 noalias(r_integrated_stress_vector) = predictive_stress_vector;
 
-                if (r_constitutive_law_options.Is(ConstitutiveLaw::COMPUTE_CONSTITUTIVE_TENSOR)) {
+                if (r_constitutive_law_options.Is(ConstitutiveLaw::COMPUTE_CONSTITUTIVE_TENSOR) &&
+                    r_current_process_info[NL_ITERATION_NUMBER] >  5) {
                     this->CalculateTangentTensor(rValues); // this modifies the ConstitutiveMatrix
                 }
             }
@@ -317,7 +318,7 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::FinalizeMat
         plastic_dissipation, plastic_strain_increment,
         r_constitutive_matrix, rValues, characteristic_length,
         plastic_strain, back_stress_vector);
-
+    const ProcessInfo& r_current_process_info = rValues.GetProcessInfo();
     if (threshold_indicator > std::abs(1.0e-4 * threshold)) {
         // while loop backward euler
         /* Inside "IntegrateStressVector" the predictive_stress_vector is updated to verify the yield criterion */
@@ -597,7 +598,7 @@ Vector& GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::Calculat
             plastic_dissipation, plastic_strain_increment,
             r_constitutive_matrix, rParameterValues, characteristic_length,
             plastic_strain, back_stress_vector);
-
+        const ProcessInfo& r_current_process_info = rParameterValues.GetProcessInfo();
         if (threshold_indicator > std::abs(1.0e-4 * threshold)) {
             // while loop backward euler
             /* Inside "IntegrateStressVector" the predictive_stress_vector is updated to verify the yield criterion */
