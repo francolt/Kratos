@@ -176,8 +176,10 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::CalculateMa
                 noalias(r_integrated_stress_vector) = predictive_stress_vector;
 
                 if (r_constitutive_law_options.Is(ConstitutiveLaw::COMPUTE_CONSTITUTIVE_TENSOR) &&
-                    r_current_process_info[NL_ITERATION_NUMBER] >  5) {
+                    r_current_process_info[NL_ITERATION_NUMBER] >  4) {
                     this->CalculateTangentTensor(rValues); // this modifies the ConstitutiveMatrix
+                } else {
+                    this->CalculateValue(rValues, CONSTITUTIVE_MATRIX, r_constitutive_matrix);
                 }
             }
         }
