@@ -298,7 +298,7 @@ public:
         // We check that the perturbation has a threshold value of PerturbationThreshold
         if (ConsiderPertubationThreshold && pertubation < PerturbationThreshold) pertubation = PerturbationThreshold;
 
-        pertubation = 1E-12;
+        // pertubation = 1E-12;
         const double back_up = pertubation;
 
         // Loop over components of the strain

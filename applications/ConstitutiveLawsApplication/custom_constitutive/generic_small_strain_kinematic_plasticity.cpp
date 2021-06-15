@@ -17,6 +17,7 @@
 // Project includes
 #include "utilities/math_utils.h"
 #include "constitutive_laws_application_variables.h"
+
 #include "custom_utilities/tangent_operator_calculator_utility.h"
 #include "custom_constitutive/generic_small_strain_kinematic_plasticity.h"
 #include "custom_constitutive/constitutive_laws_integrators/generic_constitutive_law_integrator_kinematic_plasticity.h"
@@ -160,8 +161,9 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::CalculateMa
                 r_constitutive_matrix, rValues, characteristic_length,
                 plastic_strain, back_stress_vector);
 
-            if (F <= std::abs(1.0e-4 * threshold)) { // Elastic case
+            if (F <= std::abs(1.0e-4 * threshold) || r_current_process_info[NL_ITERATION_NUMBER] <= 4) { // Elastic case
                 noalias(r_integrated_stress_vector) = predictive_stress_vector;
+                // this->CalculateValue(rValues, CONSTITUTIVE_MATRIX, r_constitutive_matrix);
             } else { // Plastic case
                 // While loop backward euler
                 /* Inside "IntegrateStressVector" the predictive_stress_vector is updated to verify the yield criterion */
@@ -176,7 +178,7 @@ void GenericSmallStrainKinematicPlasticity<TConstLawIntegratorType>::CalculateMa
                 noalias(r_integrated_stress_vector) = predictive_stress_vector;
 
                 if (r_constitutive_law_options.Is(ConstitutiveLaw::COMPUTE_CONSTITUTIVE_TENSOR) &&
-                    r_current_process_info[NL_ITERATION_NUMBER] >  4) {
+                    r_current_process_info[NL_ITERATION_NUMBER] > 10) {
                     this->CalculateTangentTensor(rValues); // this modifies the ConstitutiveMatrix
                 } else {
                     this->CalculateValue(rValues, CONSTITUTIVE_MATRIX, r_constitutive_matrix);
